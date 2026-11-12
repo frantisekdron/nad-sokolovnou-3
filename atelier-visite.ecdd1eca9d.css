@@ -144,3 +144,5 @@
  @keyframes cover-type{from{transform:translateY(.08em);filter:blur(1px)}to{transform:none;filter:blur(0)}}
 }
 @media(max-width:550px){.walk-pictures{height:auto;aspect-ratio:1.35;max-height:50svh}}
+
+.walk-floor-print{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:radial-gradient(ellipse at 45% 30%,#faf3e5,#e4d8c1)}

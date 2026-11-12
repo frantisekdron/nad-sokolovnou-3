@@ -378,6 +378,18 @@ window.NS3Model = (() => {
       positionPhotos();
       if(motion)paintSoon();
     }
+    // Capture the selected slab in the same render tick, before WebGL releases
+    // its back buffer. The room viewer can continue from this exact view.
+    host.addEventListener('capture-floor',event=>{
+      const paper=event.detail.canvas;
+      paper.width=Math.min(1100,canvas.width);
+      paper.height=Math.max(1,Math.round(paper.width*canvas.height/canvas.width));
+      const ink=paper.getContext('2d');
+      paint();
+      const view=host.querySelector('.spatial-canvas');
+      if(spatial&&view&&!view.hidden)ink.drawImage(view,0,0,paper.width,paper.height);
+      ink.drawImage(canvas,0,0,paper.width,paper.height);
+    });
     function changeLevel(n,unit=null){
       n=Number(n);if(!byFloor[n])return;
       level=n;hoverFloor=0;if(!cutLevel)cutLevel=n;apartment=unit&&byFloor[n].some(k=>unitId(k)===unit)?unit:null;

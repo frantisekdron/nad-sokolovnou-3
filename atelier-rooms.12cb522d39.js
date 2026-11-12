@@ -27,15 +27,10 @@
     const shots=views[unit];
     index=(i+shots.length)%shots.length;
     const number=index,view=shots[index],ticket=++edition;
+    const entrySheet=stage.querySelector('.walk-floor-print');
     const next=new Image();
     next.alt=pictures[view.photo];next.decoding='async';
     setPhoto(next,view.photo,'(max-width: 700px) 100vw, 78vw');
-    try{await next.decode();}catch{if(ticket===edition)el('#walk-title').textContent='Fotografii se nepodařilo načíst.';return;}
-    if(ticket!==edition||!walk.open)return;
-    stopMovement();
-    const old=activeImage;
-    stage.replaceChildren(...(old?[old,next]:[next]));
-    activeImage=next;
     el('#walk-title').textContent=view.label;
     el('[data-walk-counter]').textContent=twoDigits(number+1)+' / '+twoDigits(shots.length)+' fotografií';
     el('[data-walk-unit]').textContent='Byt '+unit+'  /  '+view.floor+'. NP';
@@ -45,7 +40,13 @@
     dot.hidden=!view.point;
     if(view.point){dot.style.left=view.point[0]*100+'%';dot.style.top=view.point[1]*100+'%';}
     Array.from(panel.children).forEach((b,j)=>b.setAttribute('aria-pressed',String(j===number)));
-    if(calm.matches||!next.animate){old?.remove();return;}
+    try{await next.decode();}catch{if(ticket===edition)el('#walk-title').textContent='Fotografii se nepodařilo načíst.';return;}
+    if(ticket!==edition||!walk.open)return;
+    stopMovement();
+    const old=activeImage;
+    stage.replaceChildren(...[old||entrySheet,next].filter(Boolean));
+    activeImage=next;
+    if(calm.matches||!next.animate){old?.remove();entrySheet?.remove();return;}
     const rect=stage.getBoundingClientRect();
     const x=Math.min(rect.width,Math.max(0,(origin?.x??rect.left+rect.width/2)-rect.left));
     const y=Math.min(rect.height,Math.max(0,(origin?.y??rect.top+rect.height/2)-rect.top));
@@ -55,21 +56,29 @@
     const entering=next.animate(keyframes,{duration:origin?740:520,easing:'cubic-bezier(.2,.72,.16,1)'});
     transitions.push(entering);
     if(old)transitions.push(old.animate([{transform:'none'},{transform:'translateX('+(-direction*2.3)+'%) scale(1.025)'}],{duration:520,easing:'ease-out'}));
-    entering.finished.then(()=>{if(edition===ticket)old?.remove();}).catch(()=>{});
+    entering.finished.then(()=>{if(edition===ticket){old?.remove();entrySheet?.remove();}}).catch(()=>{});
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-enter-unit]');
     if(!b||!views[b.dataset.enterUnit]?.length)return;
-    const rect=b.getBoundingClientRect();
+    const rect=b.getBoundingClientRect(),model=el('[data-house-model]');
+    const source=model.getBoundingClientRect(),paper=document.createElement('canvas');
+    paper.className='walk-floor-print';paper.setAttribute('aria-hidden','true');
+    model.dispatchEvent(new CustomEvent('capture-floor',{detail:{canvas:paper}}));
     trigger=b;unit=b.dataset.enterUnit;
     const list=views[unit];
     let i=b.dataset.walkPhoto?list.findIndex(s=>s.photo===b.dataset.walkPhoto):list.findIndex(s=>s.floor===Number(b.dataset.floor));
     if(i<0)i=0;
-    activeImage=null;stage.replaceChildren();bindRooms();
+    activeImage=null;stage.replaceChildren(paper);bindRooms();
     el('#walk-title').textContent=list[i].label;
     walk.showModal();document.body.classList.add('walk-open');
     el('[data-walk-close]').focus({preventScroll:true});
-    showPhoto(i,1,{x:rect.left+rect.width/2,y:rect.top+rect.height/2});
+    const box=stage.getBoundingClientRect(),ratio=Math.min(box.width/source.width,box.height/source.height);
+    const u=b.classList.contains('room-pin')?(rect.left+rect.width/2-source.left)/source.width:.5;
+    const v=b.classList.contains('room-pin')?(rect.top+rect.height/2-source.top)/source.height:.5;
+    const x=box.left+box.width/2+(u-.5)*source.width*ratio;
+    const y=box.top+box.height/2+(v-.5)*source.height*ratio;
+    showPhoto(i,1,{x,y});
   });
   panel.addEventListener('click',e=>{
     const b=e.target.closest('[data-walk-room]');
