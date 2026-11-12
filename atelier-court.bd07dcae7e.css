@@ -87,3 +87,59 @@
  .folio-filters{gap:5px}.folio-filters button{padding:7px 9px;font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.window-triptych,.film-window img,.film-window video{transition:none!important}}
+
+/* The project address, a single photograph and the building specifications. */
+.address-cover,.address-gallery,.address-contact,.design-b .house-section{--margin:clamp(22px,5.3vw,100px);padding-inline:var(--margin)}
+.address-cover{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);grid-template-areas:"name facade" "spec facade";gap:clamp(22px,3vw,48px) clamp(36px,5vw,92px);padding-block:clamp(116px,10vw,156px) clamp(42px,5vw,80px);background:#f5f1e8;color:#25312b;align-items:start}
+.address-copy{grid-area:name;scroll-margin-top:90px}
+.address-copy h1{font:400 clamp(64px,6.9vw,128px)/.96 var(--serif);letter-spacing:-.052em;margin:0}
+.address-city{margin:15px 0 0;font:500 14px/1.5 var(--sans);letter-spacing:.045em;color:#655448}
+.address-intro{max-width:37ch;margin:clamp(22px,2.7vw,46px) 0 0;font:400 clamp(16px,1.27vw,21px)/1.55 var(--sans)}
+.address-plate{grid-area:facade;align-self:stretch;position:relative;isolation:isolate;margin:0;overflow:hidden;background:#e1d9cb;min-height:clamp(360px,37vw,660px)}
+.address-plate>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 52%}
+.plate-film{position:absolute;left:clamp(12px,1.6vw,28px);bottom:clamp(12px,1.6vw,28px);display:inline-flex;align-items:center;gap:10px;background:#f9f6ef;color:#2e352f;padding:10px 16px;border-radius:30px;font:550 13px/1.3 var(--sans);box-shadow:0 1px 4px #23281e26}
+.plate-film .play-mark{display:grid;place-items:center;border-radius:50%;width:22px;height:22px;border:1px solid #a39c8a}.plate-film small{font:11px var(--mono);color:#5d584c}
+.address-facts{grid-area:spec;margin:0;font:400 clamp(13px,.95vw,16px)/1.45 var(--sans)}
+.address-facts>div{display:grid;grid-template-columns:clamp(66px,6vw,110px) 1fr;gap:11px;padding:9px 0;border-top:1px solid #c4c0af}.address-facts dt{color:#615d50}.address-facts dd{margin:0;color:#25312b}
+.design-b .house-section{background:#e9e6dc;padding-block:clamp(38px,4vw,70px)}
+.plans-heading{display:flex;gap:22px;align-items:baseline;justify-content:space-between;margin:0 0 clamp(15px,2vw,31px)}
+.design-b .plans-heading h2{margin:0;font:500 clamp(29px,2.9vw,51px)/1.12 var(--sans);letter-spacing:-.045em}
+.plans-heading p{margin:0;color:#4f5347;font:400 14px/1.5 var(--sans)}
+.address-gallery{background:#faf7ef;color:#26312c;padding-block:clamp(42px,5.5vw,90px)}
+.gallery-line{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 30px;margin-bottom:clamp(20px,2.6vw,46px);scroll-margin-top:90px}
+.address-gallery h2{font:400 clamp(38px,4.4vw,76px)/1.04 var(--serif);letter-spacing:-.035em;margin:0}
+.gallery-line .folio-filters{margin:0;gap:6px}
+.address-gallery .folio-side{align-self:center}
+.address-contact{background:#263b32;color:#fbf8ef;padding-block:clamp(42px,5vw,78px)}
+.contact-columns{display:flex;align-items:end;justify-content:space-between;gap:24px}
+.address-contact h2{font:400 16px/1.5 var(--sans);margin:0 0 18px;color:#efe9d9}
+.address-contact address{font:400 clamp(16px,1.35vw,23px)/1.45 var(--sans);display:grid;gap:7px;justify-items:start}
+.address-contact address strong{font:400 clamp(37px,4.4vw,70px)/1.04 var(--serif);letter-spacing:-.025em;margin-bottom:9px}
+.address-contact a:hover{text-decoration:underline;text-underline-offset:3px}
+.meeting-place{text-align:right}.meeting-place p{font:400 clamp(24px,2.4vw,42px)/1.18 var(--serif);margin:0 0 13px}
+.route{display:inline-flex;align-items:center;gap:5px;font-size:14px}.route svg,.address-map summary svg{width:16px;height:16px}
+.address-map{margin-top:clamp(30px,3.2vw,56px);border-block:1px solid #809487;scroll-margin-top:90px}
+.address-map summary{display:flex;align-items:center;justify-content:space-between;padding:17px 0;cursor:pointer;list-style:none;font:500 15px/1.4 var(--sans)}
+.address-map summary::-webkit-details-marker{display:none}.address-map[open] summary svg{transform:rotate(180deg)}
+.address-map .paper-atlas{padding:clamp(15px,2.1vw,35px);background:#f2eee4;color:#2c382f;margin:0 0 20px}
+.paper-pin svg{width:16px;height:16px}.address-map .paper-pin span{background:#324c40}.address-map .paper-pin[aria-pressed=true] span{background:#73452d}
+.address-map .atlas-photos figure h3{font-size:clamp(22px,2.25vw,40px)}.address-map .atlas-photos .imgbtn{width:100%;display:block}.address-map .atlas-photos .imgbtn img{width:100%;aspect-ratio:1.7;object-fit:cover}
+@media(max-width:750px){
+ .address-cover{grid-template-columns:1fr;grid-template-areas:"name" "facade" "spec";gap:22px;padding-block:88px 34px}
+ .address-copy h1{font-size:clamp(45px,8.8vw,66px)}.address-copy h1 br{display:none}
+ .address-city{font-size:13px;margin-top:8px}.address-intro{max-width:45ch;margin:14px 0 0;font-size:15px}
+ .address-plate{min-height:0;aspect-ratio:1.55}.address-facts>div{grid-template-columns:80px 1fr;padding:8px 0}
+ .plans-heading{display:block}.plans-heading p{margin-top:6px;font-size:13px}.gallery-line{display:grid;gap:14px}
+ .contact-columns{align-items:start;flex-wrap:wrap;gap:25px}.meeting-place{text-align:left}.meeting-place p{font-size:22px}
+}
+.address-gallery .folio .imgbtn{position:relative;display:block;width:100%;aspect-ratio:1.55;overflow:hidden}
+.address-gallery .folio .imgbtn>img{display:block;width:100%;height:100%;object-fit:cover}
+.address-gallery .folio-frame figcaption,.address-gallery .interactive .folio-stage{background:#2b3831;color:#fbf7ec}
+@media(max-width:750px){.address-plate{width:100%;height:clamp(165px,58vw,435px);aspect-ratio:auto;align-self:start}}
+@media(max-width:700px){
+ .design-b .atelier-head{padding-inline:clamp(12px,3.5vw,22px);gap:clamp(8px,2.5vw,18px)}
+ .design-b .atelier-head .project-logo img{width:clamp(108px,32vw,155px)}
+ .design-b .atelier-head .mainnav{display:flex;position:static;align-items:center;gap:clamp(8px,2.5vw,18px);margin:0 0 0 auto;padding:0;border:0;background:none;box-shadow:none;font:500 11px/1.3 var(--sans)}
+ .design-b .atelier-head .mainnav a{padding:10px 0;color:inherit}.design-b .atelier-head:not(.solid) .mainnav{color:#29332c}.design-b .atelier-head.solid .mainnav{color:#fbf8ef}
+ .design-b .atelier-head .contactnav{margin:0;padding:7px 8px}.design-b .atelier-head .contactnav svg,.design-b .atelier-head .menubtn{display:none}
+}

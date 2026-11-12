@@ -1,21 +1,4 @@
 'use strict';
-if(el('.plan-console')) {
-  const sheets=units.flatMap(u=>u.id==='4.1'?
-    [{u,plan:u.plan,level:4},{u,plan:'plan-4-1-horni',level:5}]:
-    [{u,plan:u.plan,level:Number(u.id[0])}]);
-  let selected=0;
-  function rotate(offset){
-    selected=(selected+offset+sheets.length)%sheets.length;
-    const {u,plan,level}=sheets[selected],pic=el('.plot img');
-    pic.src=imagePath(plan);pic.alt='Půdorys bytu '+u.id+' · '+level+'. NP';
-    el('#plan-seq').textContent=String(selected+1).padStart(2,'0')+' / 06';
-    el('#plan-floor').textContent='Byt '+u.id+' · '+level+'. NP';
-    el('#plan-name').innerHTML=u.layout+' <span>/</span> '+u.area+' m²';
-  }
-  el('[data-plan-prev]').addEventListener('click',()=>rotate(-1));
-  el('[data-plan-next]').addEventListener('click',()=>rotate(1));
-  el('[data-plan-open]').addEventListener('click',()=>{const {u,plan}=sheets[selected];unitDialog(u.id,plan);enlargeUnit();});
-}
 {
   const drawing=el('[data-house-model]');
   const floorUnits={1:['1.1'],2:['2.2','2.1'],3:['3.1'],4:['4.1'],5:['4.1']};
@@ -43,10 +26,7 @@ if(el('.plan-console')) {
       strip.append(b);
     }
     const visit=el('[data-specific-visit]');
-    visit.hidden=u.sold;visit.href=u.mail;visit.setAttribute('aria-label','Sjednat prohlídku bytu '+u.id);
-    const photoLink=el('[data-floor-photos]');
-    photoLink.hidden=!u.photos.length;
-    if(u.photos.length)photoLink.textContent='Fotografie bytu '+id+' ('+u.photos.length+')';
+    visit.hidden=u.sold;visit.href=u.mail;visit.firstChild.textContent='Prohlídka bytu '+u.id+' ';
     selectedPlan=level===5?'plan-4-1-horni':u.plan;
     all('[data-house-unit]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.houseUnit===id)));
     const img=el('.model-plan img');
@@ -67,7 +47,7 @@ if(el('.plan-console')) {
     el('.fold-house').hidden=false;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.house)===level)));
     el('[data-house-label]').textContent=level+'. nadzemní podlaží';
-    el('[data-house-title]').textContent=level===5?'Pod střechou':level===4?'Dolní úroveň mezonetu':level===2?'Dva byty v patře':'Byt přes podlaží';
+    el('[data-house-title]').textContent=level===5?'Mezonet, horní podlaží':level===4?'Mezonet, dolní podlaží':floorUnits[level].length===2?'Byty 2.1 a 2.2':'Byt '+floorUnits[level][0];
     unitChoices.replaceChildren();
     floorUnits[level].forEach(id=>{
       const button=document.createElement('button');button.dataset.houseUnit=id;
@@ -100,21 +80,10 @@ if(el('.plan-console')) {
   });
   drawing.addEventListener('house-side',event=>{
     const court=event.detail==='court';
-    setPhoto(el('.model-cover-photo'),court?'ch-2-2-lodzie':'ch-dum-pruceli','(max-width:760px) 35vw, 24vw');
-    el('.model-cover-photo').alt=court?'Lodžie bytu 2.2 do vnitrobloku':'Průčelí rezidence z ulice';
-    el('.model-overview .drawing-label').textContent=court?'Pohled z lodžie · Byt 2.2':'Pohled z ulice';
+    setPhoto(el('.model-cover-photo'),court?'ch-2-2-lodzie':'fasada-podhled','(max-width:760px) 35vw, 24vw');
+    el('.model-cover-photo').alt=court?'Lodžie bytu 2.2 do vnitrobloku':'Cihlová fasáda a ostění oken z ulice';
+    el('.model-overview .drawing-label').textContent=court?'Pohled z lodžie · Byt 2.2':'Detail uliční fasády';
   });
-  all('[data-room-choice]').forEach((b,i)=>b.addEventListener('click',()=>{
-    const link=el('.mezonet-plan'),n=i===0?4:5;
-    link.dataset.goFloor=String(n);link.href='?patro='+n+'#byty';link.firstChild.textContent='Otevřít '+n+'. NP ve 3D ';
-  }));
-  all('[data-go-floor]').forEach(link=>link.addEventListener('click',e=>{
-    if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
-    e.preventDefault();
-    const target=Number(link.dataset.goFloor);chooseFloor(target);
-    board.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
-    el('[data-house="'+target+'"]').focus({preventScroll:true});
-  }));
   if(new URLSearchParams(location.search).get('pohled')==='dvur'&&location.hash==='#byty'){
     const watcher=new MutationObserver(()=>{
       if(drawing.dataset.renderer==='spatial'){
@@ -132,56 +101,14 @@ if(el('.plan-console')) {
     },{threshold:.10});
     entrance.observe(drawing);
   }
-  el('[data-house-first]').addEventListener('click',()=>{chooseFloor(1);el('[data-house="1"]').focus({preventScroll:true});});
   unitChoices.addEventListener('click',event=>{const b=event.target.closest('[data-house-unit]');if(b){selectApartment(b.dataset.houseUnit);model.selectUnit(b.dataset.houseUnit);}});
-  all('[data-house], [data-house-first]').forEach(b=>b.disabled=false);
+  all('[data-house]').forEach(b=>b.disabled=false);
   el('.fold-house').addEventListener('click',()=>{
     el('.model-transit').hidden=true;
     model.reset();board.dataset.travel='returning';board.removeAttribute('data-selected');el('.model-overview').hidden=true;el('.model-result').hidden=true;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed','false'));el('[data-house="'+level+'"]').focus({preventScroll:true});
     el('.fold-house').hidden=true;level=0;
   });
-  el('[data-floor-photos]').addEventListener('click',()=>unitDialog(selectedId,lookup(selectedId).image));
   el('[data-floor-detail]').addEventListener('click',()=>unitDialog(selectedId,selectedPlan));
   el('[data-floor-plan]').addEventListener('click',()=>{unitDialog(selectedId,selectedPlan);enlargeUnit();});
-}
-
-{
-  const film=el('[data-film]'),toggle=el('[data-film-toggle]'),triptych=el('.window-triptych');
-  const buttons=all('[data-film-chapter]'),panels=all('.film-window');
-  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  let selected=0,visible=false,wanted=!reduced.matches&&!navigator.connection?.saveData;
-  function sync(){
-    if(!visible||!wanted||document.hidden||el('#project-cinema').open){film.pause();return;}
-    const url='assets/atelier/okno-'+panels[selected].dataset.sceneKey+'.mp4';
-    if(film.getAttribute('src')!==url)film.src=url;
-    film.play().catch(()=>{});
-  }
-  function select(i){
-    if(i===selected)return;
-    selected=i;film.pause();film.classList.remove('has-frame');film.removeAttribute('src');film.load();
-    panels[i].prepend(film);triptych.dataset.window=String(i);
-    buttons.forEach((b,j)=>b.setAttribute('aria-pressed',String(j===i)));sync();
-  }
-  buttons.forEach((b,i)=>{
-    b.addEventListener('click',()=>select(i));
-    b.addEventListener('keydown',e=>{
-      if(!['ArrowLeft','ArrowRight'].includes(e.key))return;
-      e.preventDefault();const next=(i+(e.key==='ArrowLeft'?-1:1)+buttons.length)%buttons.length;
-      select(next);buttons[next].focus({preventScroll:true});
-    });
-  });
-  function label(){
-    const playing=!film.paused;
-    toggle.dataset.playing=String(playing);
-    const text=playing?'Pozastavit záběr':'Přehrát záběr';toggle.setAttribute('aria-label',text);el('[data-film-label]').textContent=text;
-  }
-  toggle.hidden=false;
-  toggle.addEventListener('click',()=>{wanted=film.paused;sync();});
-  film.addEventListener('playing',()=>{film.classList.add('has-frame');label();});film.addEventListener('pause',label);
-  film.addEventListener('error',()=>{film.classList.remove('has-frame');label();});
-  reduced.addEventListener('change',()=>{wanted=!reduced.matches&&!navigator.connection?.saveData;sync();});
-  document.addEventListener('visibilitychange',sync);
-  el('#project-cinema').addEventListener('close',sync);
-  new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;sync();}).observe(triptych);
 }

@@ -19,7 +19,6 @@
     }
     raf=requestAnimationFrame(frame);
   }
-  const twoDigits=n=>String(n).padStart(2,'0');
 
   function stopMovement(){
     transitions.forEach(animation=>animation.cancel());
@@ -29,9 +28,9 @@
     panel.replaceChildren();
     views[unit].forEach((view,i)=>{
       const button=document.createElement('button');
-      const number=document.createElement('small'),label=document.createElement('span');
-      number.textContent=twoDigits(i+1);label.textContent=view.label;
-      button.type='button';button.dataset.walkRoom=String(i);button.append(number,label);
+      const label=document.createElement('span');
+      label.textContent=view.label;
+      button.type='button';button.dataset.walkRoom=String(i);button.append(label);
       panel.append(button);
     });
   }
@@ -45,7 +44,7 @@
     next.alt=pictures[view.photo];next.decoding='async';
     setPhoto(next,view.photo,'(max-width: 700px) 100vw, 78vw');
     el('#walk-title').textContent=view.label;
-    el('[data-walk-counter]').textContent=twoDigits(number+1)+' / '+twoDigits(shots.length)+' fotografií';
+    el('[data-walk-counter]').textContent='Fotografie '+(number+1)+' z '+shots.length;
     el('[data-walk-unit]').textContent='Byt '+unit+'  /  '+view.floor+'. NP';
     const cut=unit.replace('.','-')+(view.floor===5?'-horni':'');
     map.src='assets/model/cut-'+cut+'.webp';
@@ -149,28 +148,28 @@
 }
 
 {
-  const header=el('.atelier-head'),hero=el('.film-cover');
+  const header=el('.atelier-head'),hero=el('.address-cover');
   const links=all('.atelier-head .mainnav a'),sections=links.map(a=>el(a.getAttribute('href')));
-  const calm=matchMedia('(prefers-reduced-motion: reduce)');
   let frame=0,atTop=true;
   function update(){
     frame=0;
     const cover=hero.getBoundingClientRect();
     const near=cover.bottom>100;
     if(atTop!==near){atTop=near;header.classList.toggle('solid',!near);}
-    const travel=Math.min(1,Math.max(0,-cover.top/cover.height));
-    if(near)hero.style.setProperty('--cover-scroll',calm.matches?'0':travel.toFixed(3));
     const y=Math.min(innerHeight*.36,240);
     const section=sections.filter(s=>s.getBoundingClientRect().top<=y).at(-1);
     links.forEach((link,i)=>{if(sections[i]===section)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});
   }
   const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};
   addEventListener('scroll',schedule,{passive:true});addEventListener('resize',schedule);
-  calm.addEventListener('change',schedule);update();
+  update();
 }
 
 {
   const atlas=el('.atlas-window'),print=atlas.querySelector('.map-print');
+  const mapSection=el('#podoli');
+  function openMapLink(){if(location.hash==='#podoli')mapSection.open=true;}
+  addEventListener('hashchange',openMapLink);openMapLink();
   const pins=Array.from(atlas.querySelectorAll('.paper-pin'));
   const views=all('[data-near-view]'),mouse=matchMedia('(hover: hover)');
   function preview(pin){
