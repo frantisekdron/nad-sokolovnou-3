@@ -38,6 +38,40 @@ window.NS3Model = (() => {
       evening=b.dataset.modelLight==='evening';host.dataset.light=evening?'evening':'day';
       lightButtons.forEach(k=>k.setAttribute('aria-pressed',String(k===b)));paintSoon();
     }));
+    const photoData=JSON.parse(document.querySelector('#room-views').textContent);
+    const pins=document.createElement('div');
+    pins.className='room-pins';pins.hidden=true;
+    pins.setAttribute('role','group');pins.setAttribute('aria-label','Fotografie místností v půdorysu');
+    host.append(pins);
+    let pinState='',pinLocations=[];
+    function positionPhotos(){
+      pins.hidden=!level||!!motion;
+      if(pins.hidden)return;
+      const key=level+'|'+(visibleApartment||'');
+      if(key!==pinState){
+        pinState=key;pinLocations=[];pins.replaceChildren();
+        for(const part of planParts(level)){
+          const id=unitId(part.k);
+          if(visibleApartment&&id!==visibleApartment)continue;
+          for(const view of photoData[id]||[]){
+            if(!view.point||view.floor!==level)continue;
+            const button=document.createElement('button');
+            button.type='button';button.className='room-pin';
+            button.dataset.enterUnit=id;button.dataset.walkPhoto=view.photo;
+            button.setAttribute('aria-label','Fotografie: '+view.label+', byt '+id);
+            button.innerHTML='<i aria-hidden="true"></i><span></span>';
+            button.lastElementChild.textContent=view.label;
+            pins.append(button);
+            const [u,v]=view.point;
+            pinLocations.push({button,point:[part.left+part.width*u,floorY(level)+.12,front-part.depth+part.depth*v]});
+          }
+        }
+      }
+      for(const {button,point} of pinLocations){
+        const [x,y]=proj(point);
+        button.style.left=x+'px';button.style.top=y+'px';
+      }
+    }
     const labelNodes=[];
     for(let n=1;n<=5;n++){
       const b=document.createElement('button');b.type='button';b.textContent=n+'. NP';b.dataset.modelFloor=n;b.setAttribute('aria-label',n+'. NP – otevřít podlaží');b.setAttribute('aria-pressed','false');
@@ -97,28 +131,35 @@ window.NS3Model = (() => {
       quietControl.checked=!quiet;
     }
     syncMotionControl();
-    quietControl.addEventListener('change',()=>{quiet=!quietControl.checked;});
+    quietControl.addEventListener('change',()=>{quiet=!quietControl.checked;if(motion&&quiet){motion.soft=true;motion.transfer=false;paintSoon();}});
     function openingPose(start,dest,n,t,soft){
-      const split=ease((t-.035)/.30);
-      const overheadTurn=ease((t-.28)/.43);
-      const unveil=ease((t-.33)/.36);
-      const approach=ease((t-.60)/.40);
-      const strength=soft?.43:1;
-      const mid={...closedCamera(),az:azClosed-.32*strength,tilt:rad(24),
-        ty:9.1+(3-n)*1.75*strength,tz:.65*strength,coverage:.69,spread:2.95*strength};
-      const distant={...dest,coverage:dest.coverage*(soft?.78:.54),tilt:rad(84),az:-.06};
-      blend(start,mid,split);
-      for(const key of ['az','tilt','ty','tx','tz','coverage']){
-        state[key]=mix(mix(state[key],distant[key],overheadTurn),dest[key],approach);
+      // The audience sees the facade peel away in profile before the lens crosses
+      // the exposed slab. All poses share the slab's own world-space coordinates.
+      const separate=ease(t/.34), turn=ease((t-.25)/.46), settle=ease((t-.64)/.36);
+      const gallery={...closedCamera(),az:azClosed-.31,tilt:rad(19),
+        ty:floorY(n)+1.2,tz:2.1,coverage:.73,spread:2.55,cut:0};
+      const section={...dest,az:planYaw-.12,tilt:rad(39),ty:floorY(n)+.75,
+        tz:dest.tz+1.25,coverage:Math.min(dest.coverage*.78,1.14),spread:.72,cut:.91};
+      for(const key of Object.keys(state)){
+        const parted=mix(start[key],gallery[key],separate);
+        state[key]=mix(mix(parted,section[key],turn),dest[key],settle);
       }
-      state.spread=mid.spread*split*(1-approach);
-      state.cut=unveil;
-      return t<.30?'separate':t<.62?'overhead':'dive';
+      return t<.28?'separate':t<.65?'section':'dive';
+    }
+    function transferPose(from,dest,old,n,t){
+      // Pass along the facade at floor height. Exchange the drawings only while
+      // they are enclosed by the shell and their two coordinate frames coincide.
+      const oldView={...closedCamera(),az:azClosed-.26,tilt:rad(25),ty:floorY(old)+.85,tz:1,coverage:.92};
+      const nextView={...oldView,ty:floorY(n)+.85};
+      if(t<.39){cutLevel=old;blend(from,oldView,ease(t/.39));return;}
+      if(t<.59){cutLevel=n;blend(oldView,nextView,ease((t-.39)/.20));return;}
+      cutLevel=n;visibleApartment=apartment;
+      openingPose(nextView,dest,n,(t-.59)/.41,false);
     }
     function animateTo(kind){
       const from={...state};
-      const returnTime=kind==='open'&&(state.cut>.015||state.spread>.02)?(quiet?310:720):0;
-      motion={kind,from,since:performance.now(),returnTime,soft:quiet,
+      const transfer=kind==='open'&&cutLevel&&cutLevel!==level&&(state.cut>.015||state.spread>.02)&&!quiet;
+      motion={kind,from,since:performance.now(),transfer,soft:quiet,
         oldFloor:cutLevel};
       host.dataset.pose='moving';host.dataset.phase=kind==='close'?'return':'separate';
       paintSoon();
@@ -126,20 +167,23 @@ window.NS3Model = (() => {
     // Compute the camera, drawing, and interaction state from one clock.
     function updateMotion(now){
       if(!motion)return;
-      const {kind,from,since,returnTime,soft}=motion;
+      const {kind,from,since,soft,transfer,oldFloor}=motion;
       const elapsed=Math.max(0,now-since),dest=targetCamera(),closed=closedCamera();
-      if(elapsed<returnTime){
-        host.dataset.phase='return';blend(from,closed,ease(elapsed/returnTime));return;
-      }
-      const duration=kind==='open'?(soft?1450:3550):kind==='close'?(soft?600:1500):soft?360:660;
-      const t=Math.min(1,(elapsed-returnTime)/duration);
+      const duration=soft?1:kind==='open'?(transfer?2780:3140):kind==='close'?1480:620;
+      const t=Math.min(1,elapsed/duration);
       travelTrack.style.setProperty('--journey',String(kind==='close'?1-t:t));
       if(kind==='open'){
-        cutLevel=level;visibleApartment=apartment;
-        const phase=openingPose(returnTime?closed:from,dest,level,t,soft);
+        let phase;
+        if(transfer){
+          transferPose(from,dest,oldFloor,level,t);
+          phase=t<.59?'transfer':'dive';
+        }else{
+          cutLevel=level;visibleApartment=apartment;
+          phase=openingPose(from,dest,level,t,soft);
+        }
         if(host.dataset.phase!==phase){
-          caption.textContent=level+'. NP / '+(phase==='overhead'?'Pohled nad patro':phase==='dive'?'Přiblížení půdorysu':'Otevření domu');
-          host.dataset.phase=phase;
+          const names={transfer:'Přejezd mezi patry',section:'Prostorový řez',dive:'Přiblížení půdorysu',separate:'Otevření domu'};
+          caption.textContent=level+'. NP / '+names[phase];host.dataset.phase=phase;
         }
       }else if(kind==='close' && motion.oldFloor && from.cut>.965){
         host.dataset.phase='return';
@@ -331,6 +375,7 @@ window.NS3Model = (() => {
           ctx.beginPath();ctx.moveTo(p[0]+1,p[1]);ctx.lineTo(xPx-4,yPx);ctx.strokeStyle='#70664d';ctx.lineWidth=.8;ctx.stroke();
         }
       }
+      positionPhotos();
       if(motion)paintSoon();
     }
     function changeLevel(n,unit=null){
@@ -390,7 +435,7 @@ window.NS3Model = (() => {
       const box=canvas.getBoundingClientRect(),point=[e.clientX-box.left,e.clientY-box.top];
       highlight(hit.slice().reverse().find(f=>inside(point,f.poly))?.floor||0);
     });
-    canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY,level?planYaw:azClosed];});
+    canvas.addEventListener('pointerdown',e=>{if(!e.isPrimary || motion)return;canvas.setPointerCapture(e.pointerId);down=[e.clientX,e.clientY,level?planYaw:azClosed];});
     canvas.addEventListener('pointermove',e=>{if(!down||motion||Math.abs(e.clientX-down[0])<5)return;
       const angle=down[2]+(e.clientX-down[0])*.005;
       if(!level){azClosed=houseAngle(angle);state.az=azClosed;}
@@ -403,7 +448,7 @@ window.NS3Model = (() => {
       if(!level){const f=hit.slice().reverse().find(f=>inside(pt,f.poly));if(f)activate(f.floor);}
       else if(level===2){const u=unitHit.slice().reverse().find(v=>inside(pt,v.poly));if(u){selectUnit(u.id);onApartment?.(u.id);}}
     });
-    reduced.addEventListener('change',()=>{quiet=reduced.matches;syncMotionControl();});
+    reduced.addEventListener('change',()=>{quiet=reduced.matches;syncMotionControl();if(motion&&quiet){motion.soft=true;motion.transfer=false;paintSoon();}});
     host.dataset.pose='house';
     sizing();
     return {select:changeLevel,selectUnit,reset,get current(){return level||null;}};

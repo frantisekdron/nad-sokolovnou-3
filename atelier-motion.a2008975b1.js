@@ -147,14 +147,26 @@
   // Both exhibitions keep their complete views readable without JavaScript.
   function exhibit(container,buttonSelector,viewSelector,buttonKey,viewKey){
     const root=el(container),buttons=Array.from(root.querySelectorAll(buttonSelector)),views=Array.from(root.querySelectorAll(viewSelector));
-    let active=0,animation;
+    let active=0,animation,overlay;
     function choose(n,initial=false){
-      if(!initial&&n===active)return;active=n;animation?.cancel();
+      if(!initial&&n===active)return;
+      const last=views.find(v=>Number(v.dataset[viewKey])===active);
+      const outgoing=last?.querySelector('.imgbtn img');
+      active=n;animation?.cancel();overlay?.remove();
       let view;
       for(const item of views){item.hidden=Number(item.dataset[viewKey])!==n;if(!item.hidden)view=item;}
       for(const button of buttons)button.setAttribute('aria-pressed',String(Number(button.dataset[buttonKey])===n));
       if(!initial && !calm.matches && view.animate){
-        animation=view.animate([{clipPath:'inset(3% 0 5% 0)',opacity:.45,transform:'translateY(9px)'},{clipPath:'inset(0)',opacity:1,transform:'none'}],{duration:520,easing:'cubic-bezier(.16,.68,.2,1)'});
+        const surface=view.querySelector('.imgbtn');
+        if(surface&&outgoing){
+          const curtain=outgoing.cloneNode(false);
+          curtain.className='photo-curtain';curtain.alt='';curtain.setAttribute('aria-hidden','true');
+          surface.append(curtain);overlay=curtain;
+          animation=curtain.animate([{clipPath:'inset(0)',transform:'none'},{clipPath:'inset(0 0 0 100%)',transform:'scale(1.035)'}],{duration:650,easing:'cubic-bezier(.2,.7,.18,1)'});
+          animation.finished.then(()=>curtain.remove()).catch(()=>curtain.remove());
+        }
+        const words=view.querySelector('figcaption');
+        words?.animate([{transform:'translateY(9px)'},{transform:'none'}],{duration:440,easing:'ease-out'});
       }
     }
     buttons.forEach(b=>b.addEventListener('click',()=>choose(Number(b.dataset[buttonKey]))));
@@ -166,6 +178,7 @@
     root.classList.add('ready');choose(0,true);
   }
   exhibit('.room-spread','[data-room-choice]','[data-room-shot]','roomChoice','roomShot');
+  exhibit('.material-cabinet','[data-sample]','[data-sample-view]','sample','sampleView');
   exhibit('.paper-atlas','[data-near]','[data-near-view]','near','nearView');
 }
 

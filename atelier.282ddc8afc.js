@@ -25,6 +25,11 @@ if(el('.plan-console')) {
   function selectApartment(id) {
     const u=lookup(id);
     selectedId=id;
+    const enter=el('.walk-invite');
+    enter.hidden=u.sold || !u.photos.length;
+    enter.dataset.enterUnit=id;
+    enter.dataset.floor=String(level);
+    enter.setAttribute('aria-label','Vstoupit do bytu '+id+' na fotografiích');
     const strip=el('[data-apartment-filmstrip]');
     strip.replaceChildren();strip.hidden=!u.photos.length;
     const indexes=Array.from(new Set([0,Math.floor(u.photos.length/2),u.photos.length-1]));
@@ -54,6 +59,11 @@ if(el('.plan-console')) {
     board.dataset.selected=String(level);
     board.dataset.travel='opening';
     el('.model-overview').hidden=true; el('.model-result').hidden=true;
+    const visit=lookup(floorUnits[level][0]);
+    el('.transit-photo').style.backgroundImage='url("assets/'+visit.photos[level===5?0:level===4?1:0]+'-640.webp")';
+    el('[data-transit-floor]').textContent=level+'. NP';
+    el('[data-transit-title]').textContent=level===5?'Podkroví mezonetu':level===2?'Dva byty v patře':'Otevření podlaží';
+    el('.model-transit').hidden=false;
     el('.fold-house').hidden=false;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.house)===level)));
     el('[data-house-label]').textContent=level+'. nadzemní podlaží';
@@ -67,6 +77,7 @@ if(el('.plan-console')) {
   }
   function arrive(n){
     board.dataset.travel=n?'arrived':'home';
+    el('.model-transit').hidden=true;
     el('.model-result').hidden=!n;
     el('.model-overview').hidden=!!n;
     el('[data-arrival]').textContent=n?'Otevřeno '+n+'. nadzemní podlaží.':'Celý dům.';
@@ -74,10 +85,20 @@ if(el('.plan-console')) {
   const model=window.NS3Model.mount(drawing,depart,selectApartment,arrive);
   function chooseFloor(n){ model.select(n); depart(n); }
   all('[data-house]').forEach(b=>b.addEventListener('click',()=>chooseFloor(Number(b.dataset.house))));
+  const requestedFloor=Number(new URLSearchParams(location.search).get('patro'));
+  if(location.hash==='#byty'&&floorUnits[requestedFloor]){
+    const entrance=new IntersectionObserver(([entry])=>{
+      if(!entry.isIntersecting)return;
+      entrance.disconnect();
+      if(!board.hasAttribute('data-selected'))chooseFloor(requestedFloor);
+    },{threshold:.10});
+    entrance.observe(drawing);
+  }
   el('[data-house-first]').addEventListener('click',()=>{chooseFloor(1);el('[data-house="1"]').focus({preventScroll:true});});
   unitChoices.addEventListener('click',event=>{const b=event.target.closest('[data-house-unit]');if(b){selectApartment(b.dataset.houseUnit);model.selectUnit(b.dataset.houseUnit);}});
   all('[data-house], [data-house-first]').forEach(b=>b.disabled=false);
   el('.fold-house').addEventListener('click',()=>{
+    el('.model-transit').hidden=true;
     model.reset();board.dataset.travel='returning';board.removeAttribute('data-selected');el('.model-overview').hidden=true;el('.model-result').hidden=true;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed','false'));el('[data-house="'+level+'"]').focus({preventScroll:true});
     el('.fold-house').hidden=true;level=0;
