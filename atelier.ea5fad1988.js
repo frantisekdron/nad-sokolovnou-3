@@ -85,6 +85,44 @@ if(el('.plan-console')) {
   const model=window.NS3Model.mount(drawing,depart,selectApartment,arrive);
   function chooseFloor(n){ model.select(n); depart(n); }
   all('[data-house]').forEach(b=>b.addEventListener('click',()=>chooseFloor(Number(b.dataset.house))));
+  const theatre=el('#model-theatre'),wide=el('[data-model-wide]'),slot=document.createComment('model position');
+  board.before(slot);
+  function wideLabel(open){
+    const label=open?'Zavřít větší pohled':'Zvětšit model';
+    wide.setAttribute('aria-pressed',String(open));wide.setAttribute('aria-label',label);wide.querySelector('span').textContent=label;
+  }
+  wide.addEventListener('click',()=>{
+    if(theatre.open){theatre.close();return;}
+    theatre.append(board);theatre.showModal();document.body.classList.add('model-open');wideLabel(true);wide.focus({preventScroll:true});
+  });
+  theatre.addEventListener('close',()=>{
+    slot.after(board);wideLabel(false);document.body.classList.remove('model-open');wide.focus({preventScroll:true});
+  });
+  drawing.addEventListener('house-side',event=>{
+    const court=event.detail==='court';
+    setPhoto(el('.model-cover-photo'),court?'ch-2-2-lodzie':'ch-dum-pruceli','(max-width:760px) 35vw, 24vw');
+    el('.model-cover-photo').alt=court?'Lodžie bytu 2.2 do vnitrobloku':'Průčelí rezidence z ulice';
+    el('.model-overview .drawing-label').textContent=court?'Pohled z lodžie · Byt 2.2':'Pohled z ulice';
+  });
+  all('[data-room-choice]').forEach((b,i)=>b.addEventListener('click',()=>{
+    const link=el('.mezonet-plan'),n=i===0?4:5;
+    link.dataset.goFloor=String(n);link.href='?patro='+n+'#byty';link.firstChild.textContent='Otevřít '+n+'. NP ve 3D ';
+  }));
+  all('[data-go-floor]').forEach(link=>link.addEventListener('click',e=>{
+    if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+    e.preventDefault();
+    const target=Number(link.dataset.goFloor);chooseFloor(target);
+    board.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+    el('[data-house="'+target+'"]').focus({preventScroll:true});
+  }));
+  if(new URLSearchParams(location.search).get('pohled')==='dvur'&&location.hash==='#byty'){
+    const watcher=new MutationObserver(()=>{
+      if(drawing.dataset.renderer==='spatial'){
+        watcher.disconnect();if(!model.current)model.chooseSide('court');
+      }
+    });
+    watcher.observe(drawing,{attributes:true,attributeFilter:['data-renderer']});
+  }
   const requestedFloor=Number(new URLSearchParams(location.search).get('patro'));
   if(location.hash==='#byty'&&floorUnits[requestedFloor]){
     const entrance=new IntersectionObserver(([entry])=>{
@@ -109,59 +147,41 @@ if(el('.plan-console')) {
 }
 
 {
-  const film = el('[data-film]');
-  const toggle = el('[data-film-toggle]');
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let wanted = !reduced.matches && !navigator.connection?.saveData;
-  let visible = false;
-  function loadFilm() {
-    if(film.getAttribute('src'))return;
-    const format=matchMedia('(max-width:700px)').matches?'mobil':'siroky';
-    film.src='assets/atelier/pruceli-'+format+'.mp4';
+  const film=el('[data-film]'),toggle=el('[data-film-toggle]'),triptych=el('.window-triptych');
+  const buttons=all('[data-film-chapter]'),panels=all('.film-window');
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let selected=0,visible=false,wanted=!reduced.matches&&!navigator.connection?.saveData;
+  function sync(){
+    if(!visible||!wanted||document.hidden||el('#project-cinema').open){film.pause();return;}
+    const url='assets/atelier/okno-'+panels[selected].dataset.sceneKey+'.mp4';
+    if(film.getAttribute('src')!==url)film.src=url;
+    film.play().catch(()=>{});
   }
-  function syncFilm() {
-    if (!wanted || !visible || document.hidden || el('#project-cinema')?.open) {
-      film.pause();
-      return;
-    }
-    loadFilm();
-    film.play().catch(() => {});
+  function select(i){
+    if(i===selected)return;
+    selected=i;film.pause();film.classList.remove('has-frame');film.removeAttribute('src');film.load();
+    panels[i].prepend(film);triptych.dataset.window=String(i);
+    buttons.forEach((b,j)=>b.setAttribute('aria-pressed',String(j===i)));sync();
   }
-  function updateControl() {
-    const playing = !film.paused;
-    const label = playing ? 'Pozastavit film' : 'Přehrát film';
-    toggle.dataset.playing = String(playing);
-    toggle.setAttribute('aria-label', label);
-    el('[data-film-label]').textContent = label;
+  buttons.forEach((b,i)=>{
+    b.addEventListener('click',()=>select(i));
+    b.addEventListener('keydown',e=>{
+      if(!['ArrowLeft','ArrowRight'].includes(e.key))return;
+      e.preventDefault();const next=(i+(e.key==='ArrowLeft'?-1:1)+buttons.length)%buttons.length;
+      select(next);buttons[next].focus({preventScroll:true});
+    });
+  });
+  function label(){
+    const playing=!film.paused;
+    toggle.dataset.playing=String(playing);
+    const text=playing?'Pozastavit záběr':'Přehrát záběr';toggle.setAttribute('aria-label',text);el('[data-film-label]').textContent=text;
   }
-  const chapters=all('[data-film-chapter]');
-  const chapterBar=el('.film-chapters');
-  let pendingSeek=null;
-  function seek(){
-    if(pendingSeek===null || film.readyState<1)return;
-    film.currentTime=pendingSeek;pendingSeek=null;
-  }
-  function markChapter(){
-    const time=film.currentTime;
-    const chapter=time<3.9 || time>=11.4?0:time<7.7?1:2;
-    chapters.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===chapter)));
-  }
-  chapterBar.hidden=false;
-  chapters.forEach(b=>b.addEventListener('click',()=>{
-    pendingSeek=Number(b.dataset.filmChapter);loadFilm();
-    if(!film.readyState)film.load();
-    seek();
-    if(wanted)syncFilm();
-  }));
-  film.addEventListener('loadedmetadata',seek);
-  film.addEventListener('seeked',()=>{film.classList.add('has-frame');markChapter();});
-  film.addEventListener('timeupdate',markChapter);
-  toggle.hidden = false;
-  toggle.addEventListener('click', () => { wanted = film.paused; syncFilm(); });
-  film.addEventListener('playing', () => {film.classList.add('has-frame'); updateControl();});
-  film.addEventListener('pause', updateControl);
-  film.addEventListener('error', () => {film.classList.remove('has-frame'); toggle.hidden=true;chapterBar.hidden=true;});
-  reduced.addEventListener('change', () => {wanted=!reduced.matches && !navigator.connection?.saveData; syncFilm();});
-  document.addEventListener('visibilitychange', syncFilm);
-  new IntersectionObserver(([entry]) => {visible=entry.isIntersecting; syncFilm();}).observe(film);
+  toggle.hidden=false;
+  toggle.addEventListener('click',()=>{wanted=film.paused;sync();});
+  film.addEventListener('playing',()=>{film.classList.add('has-frame');label();});film.addEventListener('pause',label);
+  film.addEventListener('error',()=>{film.classList.remove('has-frame');label();});
+  reduced.addEventListener('change',()=>{wanted=!reduced.matches&&!navigator.connection?.saveData;sync();});
+  document.addEventListener('visibilitychange',sync);
+  el('#project-cinema').addEventListener('close',sync);
+  new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;sync();}).observe(triptych);
 }

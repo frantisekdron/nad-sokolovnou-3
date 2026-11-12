@@ -4,4 +4,4 @@
 
 | [A · Edice](https://frantisekdron.github.io/nad-sokolovnou-3/edice.html) | [B · Ateliér](https://frantisekdron.github.io/nad-sokolovnou-3/atelier.html) | [C · Výtah](https://frantisekdron.github.io/nad-sokolovnou-3/vytah.html) |
 | --- | --- | --- |
-| [![Fotografická Edice](assets/nahled-edice.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/edice.html) | [![Filmové průčelí rezidence](assets/nahled-atelier.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/atelier.html) | [![Kabina výtahu](assets/nahled-vytah.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/vytah.html) |
+| [![Fotografická Edice](assets/nahled-edice.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/edice.html) | [![Filmové pohledy z ulice, podkroví a Vltavy](assets/nahled-atelier.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/atelier.html) | [![Kabina výtahu](assets/nahled-vytah.webp)](https://frantisekdron.github.io/nad-sokolovnou-3/vytah.html) |

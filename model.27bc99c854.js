@@ -24,7 +24,27 @@ window.NS3Model = (() => {
     const state={az:azClosed,tilt:rad(20),ty:7.8,tx:0,tz:0,coverage:.84,spread:0,cut:0};
     let motion=null, hoverFloor=0, visibleApartment=null;
     const travelTrack=target.parentElement;
-    let spatial=null,evening=false,planYaw=-.29;
+    let spatial=null,evening=false,planYaw=-.29,inspection=0,transferFrame=null;
+    const sheet=target.closest('.model-sheet'),scrub=sheet.querySelector('.model-scrub'),rail=sheet.querySelector('#cut-position');
+    const aspects=Array.from(sheet.querySelectorAll('[data-aspect]'));
+    const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+    const nearest=(a,b)=>a+wrap(b-a);
+    const courtFacing=()=>Math.cos(azClosed)<0;
+    function setInspection(t){
+      inspection=t;
+      const percent=Math.round(t*100);
+      if(rail.value!==String(percent))rail.value=String(percent);
+      rail.style.setProperty('--reveal',percent+'%');
+      rail.setAttribute('aria-valuetext',percent===100?'Půdorys':percent===0?'Celý dům':percent+' % otevření');
+    }
+    function syncSide(){
+      const chosen=courtFacing()?'court':'street';
+      aspects.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.aspect===chosen)));
+      if(host.dataset.side!==chosen){
+        host.dataset.side=chosen;
+        host.dispatchEvent(new CustomEvent('house-side',{bubbles:true,detail:chosen}));
+      }
+    }
     const startScene=new IntersectionObserver(entries=>{
       if(!entries.some(e=>e.isIntersecting))return;
       startScene.disconnect();
@@ -45,7 +65,7 @@ window.NS3Model = (() => {
     host.append(pins);
     let pinState='',pinLocations=[];
     function positionPhotos(){
-      pins.hidden=!level||!!motion;
+      pins.hidden=!level||!!motion||inspection<.999;
       if(pins.hidden)return;
       const key=level+'|'+(visibleApartment||'');
       if(key!==pinState){
@@ -87,7 +107,7 @@ window.NS3Model = (() => {
       const box=canvas.getBoundingClientRect();if(!box.width||!box.height)return;
       w=box.width;h=box.height;dpr=Math.min(window.devicePixelRatio||1,1.7);
       canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
-      if(level&&!motion)Object.assign(state,targetCamera());
+      if(level&&!motion){if(inspection>.999)Object.assign(state,targetCamera());else openingPose(closedCamera(),targetCamera(),level,inspection);}
       paintSoon();
     }
     const observer=new ResizeObserver(sizing);observer.observe(canvas);
@@ -110,15 +130,15 @@ window.NS3Model = (() => {
       const lo=Math.min(...parts.map(p=>p.left)),hi=Math.max(...parts.map(p=>p.left+p.width));
       const depth=Math.max(...parts.map(p=>p.depth));
       const tilt=angle(), az=overhead?0:planYaw;
-      const footprintW=(hi-lo)*Math.cos(az)+depth*Math.abs(Math.sin(az));
-      const footprintH=((hi-lo)*Math.abs(Math.sin(az))+depth*Math.cos(az))*Math.sin(tilt)+1.4*Math.cos(tilt);
+      const footprintW=(hi-lo)*Math.abs(Math.cos(az))+depth*Math.abs(Math.sin(az));
+      const footprintH=((hi-lo)*Math.abs(Math.sin(az))+depth*Math.abs(Math.cos(az)))*Math.sin(tilt)+1.4*Math.cos(tilt);
       const minDim=Math.min(w,h);
       const maxW=w*.84,maxH=h*.80;
       const fit=Math.min(maxW/footprintW,maxH/footprintH);
       return {az,tilt,ty:floorY(level)+.48,tx:(hi+lo)/2,tz:front-depth/2,coverage:fit/(minDim*.045),spread:0,cut:1};
     }
     function closedCamera(){
-      return {az:azClosed,tilt:rad(20),ty:7.8,tx:0,tz:0,coverage:.84,spread:0,cut:0};
+      return {az:azClosed,tilt:rad(courtFacing()?24:18),ty:7.65,tx:0,tz:0,coverage:.85,spread:0,cut:0};
     }
     function blend(from,to,t){
       for(const key of Object.keys(state))state[key]=mix(from[key],to[key],t);
@@ -132,73 +152,99 @@ window.NS3Model = (() => {
     }
     syncMotionControl();
     quietControl.addEventListener('change',()=>{quiet=!quietControl.checked;if(motion&&quiet){motion.soft=true;motion.transfer=false;paintSoon();}});
-    function openingPose(start,dest,n,t,soft){
-      // The audience sees the facade peel away in profile before the lens crosses
-      // the exposed slab. All poses share the slab's own world-space coordinates.
-      const separate=ease(t/.34), turn=ease((t-.25)/.46), settle=ease((t-.64)/.36);
-      const gallery={...closedCamera(),az:azClosed-.31,tilt:rad(19),
-        ty:floorY(n)+1.2,tz:2.1,coverage:.73,spread:2.55,cut:0};
-      const section={...dest,az:planYaw-.12,tilt:rad(39),ty:floorY(n)+.75,
-        tz:dest.tz+1.25,coverage:Math.min(dest.coverage*.78,1.14),spread:.72,cut:.91};
-      for(const key of Object.keys(state)){
-        const parted=mix(start[key],gallery[key],separate);
-        state[key]=mix(mix(parted,section[key],turn),dest[key],settle);
+    // Monotone cubic tangents carry camera velocity across the key poses.
+    // A change of direction levels the tangent, so the slab cannot overshoot.
+    function tangent(a,b){return a*b<=0?0:2*a*b/(a+b);}
+    function follow(poses,times,t){
+      const i=Math.min(poses.length-2,times.findIndex((v,j)=>j>0&&t<=v)-1);
+      const a=Math.max(0,i),dt=times[a+1]-times[a],u=Math.max(0,Math.min(1,(t-times[a])/dt)),u2=u*u,u3=u2*u;
+      for(const k of Object.keys(state)){
+        const left=poses[a][k],right=poses[a+1][k],slope=(right-left)/dt;
+        const before=a?tangent((left-poses[a-1][k])/(times[a]-times[a-1]),slope):0;
+        const after=a+2<poses.length?tangent(slope,(poses[a+2][k]-right)/(times[a+2]-times[a+1])):0;
+        state[k]=(2*u3-3*u2+1)*left+(u3-2*u2+u)*dt*before+(-2*u3+3*u2)*right+(u3-u2)*dt*after;
       }
-      return t<.28?'separate':t<.65?'section':'dive';
+    }
+    function openingPose(start,dest,n,t){
+      const sign=Math.cos(start.az)<0?-1:1,cy=floorY(n);
+      const shoulder={...start,az:start.az-.16*sign,tilt:rad(21),ty:cy+2.25,tx:0,
+        tz:sign*1.55,coverage:.74,spread:2.05,cut:.045};
+      const cutAngle=nearest(shoulder.az,sign<0?-2.58:-.56);
+      const section={...dest,az:cutAngle,tilt:rad(34),ty:cy+.95,tx:0,
+        tz:dest.tz+sign*1.65,coverage:Math.min(dest.coverage*.78,.97),spread:1.55,cut:.63};
+      const endAngle=nearest(cutAngle,dest.az);
+      const over={...dest,az:mix(cutAngle,endAngle,.70),tilt:rad(68),ty:cy+.62,
+        tz:dest.tz+sign*.45,coverage:dest.coverage*.89,spread:.23,cut:.96};
+      follow([start,shoulder,section,over,{...dest,az:endAngle}],[0,.28,.54,.79,1],t);
+      return t<.29?'separate':t<.73?'section':'dive';
     }
     function transferPose(from,dest,old,n,t){
-      // Pass along the facade at floor height. Exchange the drawings only while
-      // they are enclosed by the shell and their two coordinate frames coincide.
-      const oldView={...closedCamera(),az:azClosed-.26,tilt:rad(25),ty:floorY(old)+.85,tz:1,coverage:.92};
-      const nextView={...oldView,ty:floorY(n)+.85};
-      if(t<.39){cutLevel=old;blend(from,oldView,ease(t/.39));return;}
-      if(t<.59){cutLevel=n;blend(oldView,nextView,ease((t-.39)/.20));return;}
-      cutLevel=n;visibleApartment=apartment;
-      openingPose(nextView,dest,n,(t-.59)/.41,false);
+      const side=courtFacing()?-1:1,a=nearest(from.az,side<0?-2.52:-.61);
+      const oldView={...from,az:a,tilt:rad(35),tx:0,ty:floorY(old)+1.1,tz:side*1.14,coverage:.91,cut:.64,spread:1.24};
+      const newView={...oldView,ty:floorY(n)+1.1};
+      const progress=ease((t-.26)/.49),elevation=mix(old,n,progress);
+      cutLevel=progress<.5?old:n;
+      if(progress>=.5)visibleApartment=apartment;
+      transferFrame={from:old,to:n,progress,elevation};
+      const middle={...oldView,az:a-.1*side,ty:(oldView.ty+newView.ty)/2,tilt:rad(32),cut:.55};
+      follow([from,oldView,middle,newView,{...dest,az:nearest(a,dest.az)}],[0,.26,.505,.75,1],t);
     }
-    function animateTo(kind){
-      const from={...state};
-      const transfer=kind==='open'&&cutLevel&&cutLevel!==level&&(state.cut>.015||state.spread>.02)&&!quiet;
-      motion={kind,from,since:performance.now(),transfer,soft:quiet,
-        oldFloor:cutLevel};
-      host.dataset.pose='moving';host.dataset.phase=kind==='close'?'return':'separate';
-      paintSoon();
+    function animateTo(kind,end=1){
+      const from={...state},oldFloor=cutLevel;
+      const transfer=kind==='open'&&oldFloor&&oldFloor!==level&&(state.cut>.015||state.spread>.02)&&!quiet;
+      motion={kind,from,since:performance.now(),transfer,soft:quiet,oldFloor,end,start:inspection};
+      host.dataset.pose='moving';host.dataset.phase=kind==='close'?'return':kind==='open'?'separate':'detail';
+      labels.hidden=true;paintSoon();
     }
-    // Compute the camera, drawing, and interaction state from one clock.
+    function settleInspection(){
+      host.dataset.pose=inspection>=.999?'plan':'cut';
+      tools.hidden=inspection<.999;labels.hidden=true;
+      caption.textContent=level+'. NP / '+(inspection>=.999?(overhead?'půdorys':'prostorový pohled'):inspection<=.001?'celý dům':'prostorový řez');
+    }
     function updateMotion(now){
+      transferFrame=null;
       if(!motion)return;
-      const {kind,from,since,soft,transfer,oldFloor}=motion;
-      const elapsed=Math.max(0,now-since),dest=targetCamera(),closed=closedCamera();
-      const duration=soft?1:kind==='open'?(transfer?2780:3140):kind==='close'?1480:620;
-      const t=Math.min(1,elapsed/duration);
-      travelTrack.style.setProperty('--journey',String(kind==='close'?1-t:t));
+      const {kind,from,since,soft,transfer,oldFloor,end,start}=motion;
+      const dest=targetCamera(),closed=closedCamera();
+      const duration=soft?1:kind==='open'?(transfer?2450:3250):kind==='close'?1250:kind==='side'?1550:kind==='scrub'?Math.max(250,1150*Math.abs(end-start)):530;
+      const t=Math.min(1,Math.max(0,(now-since)/duration));
       if(kind==='open'){
         let phase;
-        if(transfer){
-          transferPose(from,dest,oldFloor,level,t);
-          phase=t<.59?'transfer':'dive';
-        }else{
-          cutLevel=level;visibleApartment=apartment;
-          phase=openingPose(from,dest,level,t,soft);
-        }
+        if(transfer){transferPose(from,dest,oldFloor,level,t);phase=t<.76?'transfer':'dive';}
+        else{cutLevel=level;visibleApartment=apartment;phase=openingPose(from,dest,level,t);}
+        setInspection(t);
         if(host.dataset.phase!==phase){
-          const names={transfer:'Přejezd mezi patry',section:'Prostorový řez',dive:'Přiblížení půdorysu',separate:'Otevření domu'};
+          const names={transfer:'Přejezd otevřeným řezem',section:'Prostorový řez',dive:'Přiblížení půdorysu',separate:'Otevření domu'};
           caption.textContent=level+'. NP / '+names[phase];host.dataset.phase=phase;
         }
-      }else if(kind==='close' && motion.oldFloor && from.cut>.965){
-        host.dataset.phase='return';
-        openingPose(closed,from,motion.oldFloor,1-t,soft);
+      }else if(kind==='scrub'){
+        setInspection(mix(start,end,ease(t)));openingPose(closed,dest,level,inspection);
+      }else if(kind==='close' && oldFloor && from.cut>.965){
+        openingPose(closed,from,oldFloor,1-t);
       }else{
-        host.dataset.phase=kind==='close'?'return':'detail';
-        blend(from,dest,ease(t));
+        blend(from,{...dest,az:nearest(from.az,dest.az)},ease(t));
       }
-      if(t>=1){
-        Object.assign(state,dest);cutLevel=level;motion=null;
-        host.dataset.pose=level?'plan':'house';delete host.dataset.phase;
-        if(kind==='open'&&level){caption.textContent=level+'. NP / půdorys';tools.hidden=false;onArrival?.(level);}
-        if(kind==='close'){labels.hidden=false;onArrival?.(0);}
-      }
+      travelTrack.style.setProperty('--journey',String(kind==='close'?1-t:t));
+      if(t<1)return;
+      motion=null;transferFrame=null;delete host.dataset.phase;
+      if(kind!=='scrub')Object.assign(state,dest);
+      cutLevel=level;
+      if(level){settleInspection();if(kind==='open')onArrival?.(level);}
+      else{host.dataset.pose='house';labels.hidden=false;caption.textContent=courtFacing()?'Pohled ze dvora':'Pohled z ulice';if(kind==='close')onArrival?.(0);}
     }
+    function inspectAt(t,animated){
+      if(!level)return;
+      const wasOpening=motion?.kind==='open';
+      if(wasOpening)onArrival?.(level);
+      cutLevel=level;visibleApartment=apartment;overhead=true;
+      topBtn.setAttribute('aria-pressed','true');topBtn.textContent='Prostorový pohled';
+      // Dragging takes over immediately, even midway through an automatic flight.
+      if(animated){animateTo('scrub',t);return;}
+      motion=null;transferFrame=null;delete host.dataset.phase;
+      setInspection(t);openingPose(closedCamera(),targetCamera(),level,t);settleInspection();paintSoon();
+    }
+    rail.addEventListener('input',()=>inspectAt(Number(rail.value)/100,false));
+    sheet.querySelectorAll('[data-cut-stop]').forEach(b=>b.addEventListener('click',()=>inspectAt(Number(b.dataset.cutStop)/100,true)));
     let cosAz=1,sinAz=0,cosTilt=1,sinTilt=0,scale=1,eyeDistance=70;
     function prepareLens(){
       cosAz=Math.cos(state.az);sinAz=Math.sin(state.az);
@@ -332,21 +378,29 @@ window.NS3Model = (() => {
     function paint() {
       const now=performance.now();updateMotion(now);prepareLens();
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);hit=[];unitHit=[];
-      const accelerated=spatial?.render(state,{w,h,dpr,cutLevel,level,visibleApartment,hoverFloor,light:evening,quiet})||false;
+      const accelerated=spatial?.render(state,{w,h,dpr,cutLevel,level,visibleApartment,hoverFloor,light:evening,quiet,transfer:transferFrame})||false;
       host.dataset.renderer=accelerated?'spatial':'drawing';
+      const courtButton=aspects.find(b=>b.dataset.aspect==='court');
+      courtButton.disabled=!accelerated||!!level;
+      aspects[0].disabled=!!level;
+      if(!accelerated&&!level&&courtFacing()){azClosed=-.34;Object.assign(state,closedCamera());syncSide();paintSoon();}
       if(accelerated){
         // Use the same projection as the GPU for mouse, pen and touch picking.
         if(!level && !motion){
-          hit.push({poly:frontFace(0,floorY(1)).map(proj),floor:1});
-          for(let n=1;n<=4;n++){
-            const y=floorY(n),top=y+floorHeight;
-            hit.push({poly:frontFace(y,top).map(proj),floor:n},
-              {poly:[[halfWidth,top,front],[halfWidth,top,rear],[halfWidth,y,rear],[halfWidth,y,front]].map(proj),floor:n});
-            if(state.az>0)hit.push({poly:[[-halfWidth,top,front],[-halfWidth,top,rear],[-halfWidth,y,rear],[-halfWidth,y,front]].map(proj),floor:n});
+          const faceZ=cosAz>=0?front:rear,edgeX=sinAz<0?halfWidth:-halfWidth;
+          function surface(poly,floor){
+            const corners=poly.map(proj);
+            hit.push({poly:corners,floor,depth:corners.reduce((total,p)=>total+p[2],0)/corners.length});
+          }
+          for(let n=1;n<=5;n++){
+            const y=n===1?0:floorY(n),top=floorY(n)+(n===5?2.35:floorHeight);
+            surface(frontFace(y,top,faceZ),n);
+            surface([[edgeX,top,front],[edgeX,top,rear],[edgeX,y,rear],[edgeX,y,front]],n);
           }
           const y=floorY(5);
-          hit.push({poly:[[-halfWidth,y,front],[halfWidth,y,front],[halfWidth,y+2.47,-.86],[-halfWidth,y+2.47,-.86]].map(proj),floor:5},
-            {poly:plane(-halfWidth,halfWidth,rear,-.86,y+2.47).map(proj),floor:5});
+          surface([[-halfWidth,y,front],[halfWidth,y,front],[halfWidth,y+2.47,-.86],[-halfWidth,y+2.47,-.86]],5);
+          surface(plane(-halfWidth,halfWidth,rear,-.86,y+2.47),5);
+          hit.sort((a,b)=>a.depth-b.depth);
         }
         if(cutLevel===2 && state.cut>.8){
           for(const p of planParts(2)){
@@ -368,7 +422,8 @@ window.NS3Model = (() => {
       if(!level && !motion && state.cut<.18){
         let last=h*.09-25;
         for(let n=5;n>=1;n--){const y=floorY(n)+floorHeight*.48;
-          const p=proj([halfWidth+.1,y,n===5?2:front-.2]);
+          const faceZ=cosAz>=0?(n===5?2:front-.2):rear;
+          const p=proj([cosAz>=0?halfWidth+.1:-halfWidth-.1,y,faceZ]);
           const tag=labelNodes[n-1];const yPx=Math.max(last+28,Math.min(h-28,Math.max(16,p[1])));last=yPx;
           const xPx=Math.max(w*.715,Math.min(w-48,Math.round(p[0]+8)));
           tag.style.left=xPx+'px';tag.style.top=yPx+'px';
@@ -390,9 +445,30 @@ window.NS3Model = (() => {
       if(spatial&&view&&!view.hidden)ink.drawImage(view,0,0,paper.width,paper.height);
       ink.drawImage(canvas,0,0,paper.width,paper.height);
     });
+    // The photo viewer borrows the existing camera for a short approach to the
+    // chosen room. Only its own canvas is copied; the user's plan pose is retained.
+    host.addEventListener('room-camera',event=>{
+      const shot=event.detail,part=planParts(level).find(p=>unitId(p.k)===shot.unit);
+      if(!part||!spatial||host.dataset.renderer!=='spatial'||quiet)return;
+      const [u,v]=shot.point||[.5,.50];
+      const start={...state},aimX=part.left+part.width*u,aimZ=front-part.depth*(1-v);
+      const yaw=nearest(start.az,-.27+(u-.5)*.34);
+      const stop={...start,az:yaw,tilt:rad(32),tx:aimX,ty:floorY(level)+.64,tz:aimZ,
+        coverage:Math.min(3.55,Math.max(start.coverage*1.6,2.05)),spread:0,cut:1};
+      const view=host.querySelector('.spatial-canvas'),ink=shot.canvas.getContext('2d');
+      const originalFloor=level;
+      shot.render=t=>{
+        if(level!==originalFloor||!view||view.hidden)return;
+        const k=ease(t),pose={};
+        for(const key of Object.keys(start))pose[key]=mix(start[key],stop[key],k);
+        const ok=spatial.render(pose,{w,h,dpr,cutLevel:level,level,visibleApartment,hoverFloor:0,light:evening,quiet:true});
+        if(ok){ink.clearRect(0,0,shot.canvas.width,shot.canvas.height);ink.drawImage(view,0,0,shot.canvas.width,shot.canvas.height);}
+      };
+      shot.restore=paintSoon;
+    });
     function changeLevel(n,unit=null){
       n=Number(n);if(!byFloor[n])return;
-      level=n;hoverFloor=0;if(!cutLevel)cutLevel=n;apartment=unit&&byFloor[n].some(k=>unitId(k)===unit)?unit:null;
+      scrub.hidden=false;level=n;hoverFloor=0;if(!cutLevel)cutLevel=n;apartment=unit&&byFloor[n].some(k=>unitId(k)===unit)?unit:null;
       overhead=true;topBtn.setAttribute('aria-pressed','true');topBtn.textContent='Prostorový pohled';
       host.dataset.openFloor=String(n);labels.hidden=true;tools.hidden=true;
       labelNodes.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===n-1)));
@@ -410,23 +486,28 @@ window.NS3Model = (() => {
         switches.append(b);
       }
     }
-    function selectUnit(id){if(level!==2)return;if(id&&!['2.1','2.2'].includes(id))return;apartment=id||null;if(cutLevel===level)visibleApartment=apartment;fillUnits();if(motion?.kind!=='open')animateTo('unit');}
+    function selectUnit(id){if(level!==2)return;if(id&&!['2.1','2.2'].includes(id))return;apartment=id||null;if(cutLevel===level)visibleApartment=apartment;fillUnits();if(motion?.kind!=='open'){if(inspection>=.999)animateTo('unit');else inspectAt(inspection,false);}}
     function reset(){
-      level=0;apartment=null;overhead=false;tools.hidden=true;labels.hidden=true;
-      host.removeAttribute('data-open-floor');caption.textContent='Pohled z ulice';labelNodes.forEach(b=>b.setAttribute('aria-pressed','false'));
+      scrub.hidden=true;level=0;apartment=null;overhead=false;tools.hidden=true;labels.hidden=true;
+      host.removeAttribute('data-open-floor');caption.textContent=courtFacing()?'Pohled ze dvora':'Pohled z ulice';labelNodes.forEach(b=>b.setAttribute('aria-pressed','false'));
       // Keep the previous cut attached until the return move starts reversing.
       animateTo('close');
     }
     topBtn.addEventListener('click',()=>{overhead=!overhead;topBtn.setAttribute('aria-pressed',String(overhead));topBtn.textContent=overhead?'Prostorový pohled':'Pohled shora';caption.textContent=level+'. NP / '+(overhead?'pohled shora':'prostorový řez');if(motion?.kind!=='open')animateTo('unit');});
-    function houseAngle(value){return Math.max(-.95,Math.min(host.dataset.renderer==='spatial'?.65:-.04,value));}
+    function houseAngle(value){return host.dataset.renderer==='spatial'?wrap(value):Math.max(-.95,Math.min(-.04,value));}
+    function chooseSide(side){
+      if(level||side==='court'&&host.dataset.renderer!=='spatial')return;
+      azClosed=side==='court'?-3.38:-.34;syncSide();animateTo('side');
+    }
+    aspects.forEach(b=>b.addEventListener('click',()=>chooseSide(b.dataset.aspect)));
     host.querySelectorAll('[data-spin]').forEach(button=>button.addEventListener('click',()=>{
-      if(motion && motion.kind!=='orbit')return;
+      if(motion && motion.kind!=='orbit'||level&&inspection<.999)return;
       const increment=Number(button.dataset.spin)*.24;
       if(level){
         overhead=false;planYaw=Math.min(.9,Math.max(-1.05,planYaw+increment));
         topBtn.setAttribute('aria-pressed','false');topBtn.textContent='Pohled shora';caption.textContent=level+'. NP / prostorový řez';
       }else azClosed=houseAngle(azClosed+increment);
-      animateTo('orbit');
+      syncSide();animateTo('orbit');
     }));
     function inside(p,poly){
       let yes=false;
@@ -450,8 +531,8 @@ window.NS3Model = (() => {
     canvas.addEventListener('pointerdown',e=>{if(!e.isPrimary || motion)return;canvas.setPointerCapture(e.pointerId);down=[e.clientX,e.clientY,level?planYaw:azClosed];});
     canvas.addEventListener('pointermove',e=>{if(!down||motion||Math.abs(e.clientX-down[0])<5)return;
       const angle=down[2]+(e.clientX-down[0])*.005;
-      if(!level){azClosed=houseAngle(angle);state.az=azClosed;}
-      else if(!overhead){planYaw=Math.min(.90,Math.max(-1.05,angle));Object.assign(state,targetCamera());}
+      if(!level){azClosed=houseAngle(angle);state.az=azClosed;syncSide();}
+      else if(!overhead&&inspection>=.999){planYaw=Math.min(.90,Math.max(-1.05,angle));Object.assign(state,targetCamera());}
       paintSoon();});
     canvas.addEventListener('pointercancel',()=>{down=null;});
     canvas.addEventListener('pointerup',e=>{
@@ -461,9 +542,9 @@ window.NS3Model = (() => {
       else if(level===2){const u=unitHit.slice().reverse().find(v=>inside(pt,v.poly));if(u){selectUnit(u.id);onApartment?.(u.id);}}
     });
     reduced.addEventListener('change',()=>{quiet=reduced.matches;syncMotionControl();if(motion&&quiet){motion.soft=true;motion.transfer=false;paintSoon();}});
-    host.dataset.pose='house';
+    host.dataset.pose='house';syncSide();
     sizing();
-    return {select:changeLevel,selectUnit,reset,get current(){return level||null;}};
+    return {select:changeLevel,selectUnit,reset,chooseSide,get current(){return level||null;}};
   }
   return {mount};
 })();

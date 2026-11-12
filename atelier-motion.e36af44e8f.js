@@ -25,7 +25,10 @@
 
 // An editorial spread: changing the subject reveals the next photograph in the same frame.
 {
-  const folio=el('.folio'),frames=all('.folio-frame'),tabs=all('[data-folio-index]');
+  const folio=el('.folio'),indexPanel=el('.folio-index');
+  let frames=all('.folio-frame'),tabs=all('[data-folio-index]');
+  const apartmentViews=Object.values(JSON.parse(el('#room-views').textContent)).flat();
+  const originalFrames=frames.map(n=>n.cloneNode(true)),originalTabs=tabs.map(n=>n.cloneNode(true));
   const quiet=matchMedia('(prefers-reduced-motion: reduce)');
   let active=0, running=[], touch=null,swiped=false;
   folio.classList.add('interactive');
@@ -41,6 +44,10 @@
     });
     tabs.forEach((tab,i)=>tab.setAttribute('aria-pressed',String(i===active)));
     el('[data-folio-count]').value=String(active+1).padStart(2,'0')+' / '+String(frames.length).padStart(2,'0');
+    const room=frames[active].dataset.frameKey;
+    const floor=apartmentViews.find(shot=>shot.photo===room)?.floor;
+    const link=el('.album-to-house');
+    if(floor){link.dataset.goFloor=String(floor);link.href='?patro='+floor+'#byty';link.firstChild.textContent='Otevřít '+floor+'. NP ve 3D ';}
     if(previous===active||quiet.matches||!frames[active].animate)return;
     const old=frames[previous],current=frames[active];
     old.hidden=false;
@@ -49,12 +56,30 @@
     running=[reveal,current.querySelector('img').animate([{transform:'scale(1.09)'},{transform:'scale(1)'}],{duration:780,easing:'ease-out'})];
     reveal.finished.then(()=>{if(active===next)old.hidden=true;}).catch(()=>{});
   }
-  tabs.forEach((tab,i)=>tab.addEventListener('click',()=>select(i,i>=active?1:-1)));
+  indexPanel.addEventListener('click',e=>{
+    const tab=e.target.closest('[data-folio-index]');if(tab){const i=Number(tab.dataset.folioIndex);select(i,i>=active?1:-1);}
+  });
+  all('[data-album]').forEach(button=>button.addEventListener('click',()=>{
+    if(button.getAttribute('aria-pressed')==='true')return;
+    running.forEach(a=>a.cancel());running=[];
+    const template=el('template[data-book="'+button.dataset.album+'"]');
+    const collections=template?Array.from(template.content.children).map(n=>Array.from(n.children)):[originalFrames,originalTabs];
+    frames=collections[0].map(n=>n.cloneNode(true));tabs=collections[1].map(n=>n.cloneNode(true));
+    stage.replaceChildren(...frames);indexPanel.replaceChildren(...tabs);
+    all('[data-album]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+    active=0;select(0);
+    if(!quiet.matches)stage.animate([{clipPath:'inset(0 8% 0 4%)'},{clipPath:'inset(0)'}],{duration:490,easing:'cubic-bezier(.2,.7,.2,1)'});
+  }));
   all('[data-folio-step]').forEach(b=>b.addEventListener('click',()=>{const d=Number(b.dataset.folioStep);select(active+d,d);}));
   folio.addEventListener('keydown',e=>{
     if(!['ArrowLeft','ArrowRight'].includes(e.key))return;
     e.preventDefault();const d=e.key==='ArrowLeft'?-1:1;select(active+d,d);
     if(tabs.includes(e.target))tabs[active].focus({preventScroll:true});
+  });
+  el('.folio-stage').addEventListener('click',e=>{
+    const button=e.target.closest('[data-gallery]');if(!button)return;
+    if(swiped){swiped=false;e.stopPropagation();return;}
+    e.stopPropagation();gallery=frames.map(f=>f.dataset.frameKey);showGallery(gallery.indexOf(button.dataset.gallery));
   });
   const stage=el('.folio-stage');
   stage.addEventListener('touchstart',e=>{swiped=false;touch=e.touches.length===1?[e.touches[0].clientX,e.touches[0].clientY]:null;},{passive:true});
@@ -122,10 +147,10 @@
 
 {
   const cinema=el('#project-cinema'),movie=cinema.querySelector('video');
-  const ambient=el('[data-film]');let resume=false,timestamp=null;
+  const ambient=el('[data-film]');let timestamp=null;
   function seekFilm(){if(timestamp!==null && movie.readyState>=1){movie.currentTime=timestamp;timestamp=null;}}
   el('[data-cinema-open]').addEventListener('click',()=>{
-    resume=!ambient.paused;ambient.pause();cinema.showModal();
+    ambient.pause();cinema.showModal();
     document.body.classList.add('cinema-open');
     if(!movie.getAttribute('src'))movie.src='assets/atelier/film-rezidence.mp4';
     if(movie.ended)movie.currentTime=0;
@@ -139,7 +164,7 @@
   cinema.addEventListener('cancel',()=>movie.pause());
   el('[data-cinema-close]').addEventListener('click',closeCinema);
   cinema.addEventListener('click',e=>{if(e.target===cinema){const r=cinema.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeCinema();}});
-  cinema.addEventListener('close',()=>{movie.pause();document.body.classList.remove('cinema-open');if(resume&&!document.hidden)ambient.play().catch(()=>{});});
+  cinema.addEventListener('close',()=>{movie.pause();document.body.classList.remove('cinema-open');});
 }
 
 {

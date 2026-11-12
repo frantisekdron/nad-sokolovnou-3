@@ -63,6 +63,14 @@ window.NSBuildingScene = (() => {
         data.indices.push(start,start+2,start+1,start,start+3,start+2);
       }
       const quad=(mat,vertices,uv=[[0,1],[1,1],[1,0],[0,0]])=>points(mat,vertices,uv);
+      function box(mat,x0,x1,y0,y1,z0,z1){
+        quad(mat,[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]]);
+        quad(mat,[[x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0]]);
+        quad(mat,[[x1,y1,z0],[x0,y1,z0],[x0,y0,z0],[x1,y0,z0]]);
+        quad(mat,[[x0,y1,z1],[x1,y1,z1],[x1,y0,z1],[x0,y0,z1]]);
+        quad(mat,[[x0,y1,z0],[x0,y1,z1],[x0,y0,z1],[x0,y0,z0]]);
+        quad(mat,[[x1,y1,z1],[x1,y1,z0],[x1,y0,z0],[x1,y0,z1]]);
+      }
       function finish(){
         for(const [mat,data] of batches){
           const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(data.positions,3));
@@ -70,14 +78,157 @@ window.NSBuildingScene = (() => {
           const m=new T.Mesh(g,mat);m.castShadow=true;m.receiveShadow=true;group.add(m);
         }
       }
-      return {quad,finish};
+      return {quad,box,finish};
     }
     const bands=[[795,960],[602,795],[405,602],[208,405],[0,208]];
     const ranges=[[30,86],[113,135],[163,218],[246,268],[295,349]];
     const glazing=[];
+    const grain=texture('omitka-dvur'),gravel=texture('strk-strecha');
+    for(const map of [grain,gravel]){map.wrapS=T.RepeatWrapping;map.wrapT=T.RepeatWrapping;}
+    const courtGlass=[];
+    // At the party-wall angle section the interior and the roof in the same
+    // world-space plane. A uniform moves it without rebuilding floor geometry.
+    const surveyPlane={value:new T.Vector2(1,100)};
+    function surveySection(group){
+      const materials=new Set();
+      group.traverse(node=>{if(node.material)materials.add(node.material);});
+      for(const mat of materials){
+        mat.onBeforeCompile=shader=>{
+          shader.uniforms.nsSurvey=surveyPlane;
+          shader.vertexShader='varying float nsAcross;\n'+shader.vertexShader.replace('#include <project_vertex>',
+            '#include <project_vertex>\nnsAcross=(modelMatrix*vec4(transformed,1.0)).x;');
+          shader.fragmentShader='uniform vec2 nsSurvey; varying float nsAcross;\n'+shader.fragmentShader.replace('#include <clipping_planes_fragment>',
+            '#include <clipping_planes_fragment>\nif(nsSurvey.x*nsAcross>nsSurvey.y)discard;');
+        };
+      }
+    }
+    function courtyardMaterials(){
+      const pane=print('odraz-dvur',0xd6e0e3);
+      pane.roughness=.25;pane.metalness=.13;
+      pane.emissiveMap=texture('odraz-dvur');courtGlass.push(pane);
+      return {
+        render:standard(0xffffff,{map:grain,bumpMap:grain,bumpScale:.014}),
+        sill:standard(0xcbc6b7),tile:standard(0xdfd9cb),joint:standard(0xb2aa9d),
+        steel:standard(0xa4acaa,{roughness:.40,metalness:.28}),
+        shadow:standard(0x555952,{roughness:.52}),frame:standard(0xcbcec5,{roughness:.48}),
+        pane,soffit:standard(0xd7d6ca),base:standard(0xbcbcb0)
+      };
+    }
+    function elevation(batch,mat,l,r,y0,y1,z){
+      if(r-l<.001||y1-y0<.001)return;
+      batch.quad(mat,[[r,y1,z],[l,y1,z],[l,y0,z],[r,y0,z]],
+        [[(r-l)/1.9,(y1-y0)/1.9],[0,(y1-y0)/1.9],[0,0],[(r-l)/1.9,0]]);
+    }
+    // The loggia tiles and balcony rails sit on the outline of the original
+    // apartment plan. One bay meets the plot obliquely; the opposite bay is square.
+    function rail(batch,m,x0,z0,x1,z1,y,glass=false){
+      const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz),ux=dx/len,uz=dz/len;
+      function bar(material,y0,y1,halfWidth){
+        const sx=-uz*halfWidth,sz=ux*halfWidth,a=[x0+sx,z0+sz],b=[x1+sx,z1+sz],c=[x1-sx,z1-sz],d=[x0-sx,z0-sz];
+        const v=(p,h)=>[p[0],h,p[1]];
+        batch.quad(material,[v(a,y1),v(b,y1),v(c,y1),v(d,y1)]);
+        batch.quad(material,[v(a,y1),v(b,y1),v(b,y0),v(a,y0)]);
+        batch.quad(material,[v(c,y1),v(d,y1),v(d,y0),v(c,y0)]);
+      }
+      const high=y+1.02;
+      bar(m.steel,high-.043,high,.028);
+      if(glass){
+        const count=Math.max(1,Math.round(len/1.22));
+        for(let i=0;i<count;i++){
+          const a=i*len/count+.013,b=(i+1)*len/count-.013;
+          batch.quad(m.balustrade,[[x0+ux*b,high-.045,z0+uz*b],[x0+ux*a,high-.045,z0+uz*a],
+            [x0+ux*a,y+.07,z0+uz*a],[x0+ux*b,y+.07,z0+uz*b]]);
+        }
+        bar(m.steel,y+.04,y+.105,.041);
+        return;
+      }
+      bar(m.steel,y+.10,y+.133,.025);
+      const count=Math.ceil(len/.155);
+      for(let i=0;i<=count;i++){
+        const r=i/count,x=x0+dx*r,z=z0+dz*r,radius=i===0||i===count?.029:.014;
+        batch.box(m.steel,x-radius,x+radius,y+.09,high-.035,z-radius,z+radius);
+      }
+    }
+    function terraceTile(batch,m,x0,x1,minimum,maximum,y=0){
+      const z0=typeof minimum==='number'?()=>minimum:minimum;
+      const rear0=z0(x0),rear1=z0(x1);
+      batch.quad(m.tile,[[x0,y,rear0],[x1,y,rear1],[x1,y,maximum],[x0,y,maximum]]);
+      batch.quad(m.base,[[x1,y+.015,rear1],[x0,y+.015,rear0],[x0,y-.14,rear0],[x1,y-.14,rear1]]);
+      for(let x=x0+.56;x<x1;x+=.56){
+        batch.quad(m.joint,[[x-.006,y+.006,z0(x)],[x+.006,y+.006,z0(x)],[x+.006,y+.006,maximum],[x-.006,y+.006,maximum]]);
+      }
+      for(let z=maximum-.56;z>Math.min(rear0,rear1);z-=.56){
+        let l=x0,r=x1;
+        if(rear0!==rear1){
+          const cross=x0+(z-rear0)*(x1-x0)/(rear1-rear0);
+          if(z<rear1)r=Math.min(x1,cross);
+          if(z<rear0)l=Math.max(x0,cross);
+        }
+        if(r>l)batch.quad(m.joint,[[l,y+.009,z-.006],[r,y+.009,z-.006],[r,y+.009,z+.006],[l,y+.009,z+.006]]);
+      }
+    }
+    function courtWindow(batch,m,l,r,z,y0,y1,narrow=false){
+      // The glass is inset behind a lined reveal, and reflects a muted crop of
+      // the real courtyard canopy. Frames retain their thickness at oblique angles.
+      const depth=.19,face=z+depth,frame=.062;
+      batch.quad(m.soffit,[[l,y1,z],[l,y1,face],[l,y0,face],[l,y0,z]]);
+      batch.quad(m.soffit,[[r,y1,face],[r,y1,z],[r,y0,z],[r,y0,face]]);
+      batch.quad(m.shadow,[[r,y1,z],[l,y1,z],[l,y1,face],[r,y1,face]]);
+      batch.box(m.sill,l-.045,r+.045,y0-.04,y0+.012,z-.095,face);
+      batch.quad(m.pane,[[r,y1,face],[l,y1,face],[l,y0,face],[r,y0,face]]);
+      batch.box(m.frame,l,l+frame,y0,y1,face-.060,face+.02);
+      batch.box(m.frame,r-frame,r,y0,y1,face-.060,face+.02);
+      batch.box(m.frame,l,r,y1-frame,y1,face-.060,face+.02);
+      batch.box(m.frame,l,r,y0,y0+frame,face-.060,face+.02);
+      if(!narrow){
+        const x=l+(r-l)*.54;
+        batch.box(m.frame,x-.035,x+.035,y0,y1,face-.073,face+.012);
+        batch.box(m.shadow,x+.07,x+.085,y0+.88,y0+1.05,face-.10,face-.06);
+      }
+    }
+    function paneWall(batch,m,l,r,z,height,openings){
+      let at=l;
+      for(const [x0,x1,y0,y1] of openings){
+        elevation(batch,m.render,at,x0,0,height,z);
+        elevation(batch,m.render,x0,x1,0,y0,z);elevation(batch,m.render,x0,x1,y1,height,z);
+        courtWindow(batch,m,x0,x1,z,y0,y1,x1-x0<1.1);at=x1;
+      }
+      elevation(batch,m.render,at,r,0,height,z);
+    }
+    const leftReturn=-3.56,rightReturn=4.02,leftCorner=-4.22,leftInner=-3.23,rightOuter=-6.87;
+    function rearFace(batch,m,n,height){
+      if(!n){
+        elevation(batch,m.base,-half,half,0,height,rear);
+        batch.box(m.sill,-half,half,height-.18,height,rear-.035,rear+.04);
+        return;
+      }
+      const low=.035,head=2.30,leftDoor=-2.24,rightDoor=-5.54;
+      const diagonal=x=>leftCorner+(x+half)*(leftInner-leftCorner)/(leftReturn+half);
+      terraceTile(batch,m,-half,leftReturn,diagonal,leftDoor);
+      rail(batch,m,-half+.04,diagonal(-half+.04),leftReturn-.04,diagonal(leftReturn-.04),low);
+      rail(batch,m,-half+.04,leftCorner+.03,-half+.04,leftDoor,low);
+      paneWall(batch,m,-half,leftReturn,leftDoor,height,[[-6.80,-5.43,.065,head]]);
+      batch.quad(m.render,[[leftReturn,height,rear],[leftReturn,height,leftDoor],[leftReturn,0,leftDoor],[leftReturn,0,rear]]);
+      paneWall(batch,m,leftReturn,rightReturn,rear,height,[[.52,1.57,.08,2.22]]);
+      const back=n===1?rear+.16:rightDoor;
+      batch.quad(m.render,[[rightReturn,height,back],[rightReturn,height,rear],[rightReturn,0,rear],[rightReturn,0,back]]);
+      if(n>1){
+        terraceTile(batch,m,rightReturn,half,rightOuter,rightDoor);
+        rail(batch,m,rightReturn+.035,rightOuter,half-.035,rightOuter,low);
+        rail(batch,m,half-.035,rightOuter,half-.035,rightDoor,low);
+        paneWall(batch,m,rightReturn,half,rightDoor,height,[[4.26,6.74,.055,head]]);
+      }else{
+        elevation(batch,m.render,rightReturn,half,0,height,back);
+      }
+      // A vertical seam on the core follows the grey downpipe visible beside the
+      // upper terrace. Its clips and the thin drip edge define the plaster relief.
+      batch.box(m.steel,3.75,3.83,0,height,rear-.135,rear-.053);
+      for(const h of [.54,2.36])batch.box(m.shadow,3.736,3.844,h,h+.033,rear-.141,rear-.012);
+    }
     function skin(n){
-      const group=layer(),facade=layer(group),body=layer(group),lid=layer(group),mesh=surfaces(facade),block=surfaces(body),ceiling=surfaces(lid),baseY=n?floorY(n):0;
-      Object.assign(group.userData,{facade,body,lid});
+      const group=layer(),facade=layer(group),back=layer(group),body=layer(group),lid=layer(group);
+      const mesh=surfaces(facade),court=surfaces(back),block=surfaces(body),ceiling=surfaces(lid),baseY=n?floorY(n):0;
+      Object.assign(group.userData,{facade,back,body,lid});
       group.position.y=baseY;
       const masonry=print('front'),pane=print('front',0xf6fbff),stone=standard(0xd5c5af),edge=standard(0x504c45);
       const joinery=standard(0x817e70,{roughness:.44,metalness:.36});
@@ -125,19 +276,81 @@ window.NSBuildingScene = (() => {
         left=r;
       }
       if(left<960)rect(masonry,left,960,first,last);
-      block.quad(brick,[[half,height,front],[half,height,rear],[half,0,rear],[half,0,front]]);
-      block.quad(brick,[[-half,height,rear],[-half,height,front],[-half,0,front],[-half,0,rear]]);
-      ceiling.quad(stone,[[-half,height,rear],[half,height,rear],[half,height,front],[-half,height,front]]);
-      ceiling.quad(edge,[[-half,0,rear],[half,0,rear],[half,0,front],[-half,0,front]]);
-      mesh.finish();block.finish();ceiling.finish();return group;
+      const ml=courtyardMaterials();
+      rearFace(court,ml,n,height);
+      const leftZ=n?-2.24:rear,rightZ=n>1?-5.54:n?rear+.16:rear;
+      block.quad(brick,[[half,height,front],[half,height,rightZ],[half,0,rightZ],[half,0,front]],[[0,1],[2.5,1],[2.5,0],[0,0]]);
+      block.quad(brick,[[-half,height,leftZ],[-half,height,front],[-half,0,front],[-half,0,leftZ]],[[0,1],[2.2,1],[2.2,0],[0,0]]);
+      const boards=n?[
+        [-half,leftReturn,leftCorner,leftInner],
+        [leftReturn,rightReturn,rear,rear],
+        [rightReturn,half,n>1?rightOuter:rightZ,n>1?rightOuter:rightZ]
+      ]:[[-half,half,rear,rear]];
+      const slab=standard(0xd1c7b5),underside=standard(0xe3ddcf);
+      for(const [l,r,zl,zr] of boards){
+        ceiling.quad(slab,[[l,height-.018,zl],[r,height-.018,zr],[r,height-.018,front],[l,height-.018,front]]);
+        ceiling.quad(underside,[[l,0,front],[r,0,front],[r,0,zr],[l,0,zl]]);
+      }
+      mesh.finish();court.finish();block.finish();ceiling.finish();
+      surveySection(facade);surveySection(back);return group;
     }
     const shells=[0,1,2,3,4].map(skin);
     const roof=layer(),cap=surfaces(roof),metal=standard(0x8e8d80),flashing=standard(0x514f48,{metalness:.35});
     roof.position.y=floorY(5);
     const roofPrint=print('roof');roofPrint.bumpMap=texture('roof');roofPrint.bumpScale=.032;roofPrint.roughness=.70;
     cap.quad(roofPrint,[[-half,2.47,-.86],[half,2.47,-.86],[half,0,front],[-half,0,front]]);
-    cap.quad(metal,[[-half,2.47,rear],[half,2.47,rear],[half,2.47,-.86],[-half,2.47,-.86]]);
-    for(const side of [-half,half])cap.quad(metal,[[side,2.47,rear],[side,2.47,-.86],[side,0,front],[side,0,rear]]);
+    // The upper plan steps back twice from the courtyard. Preserve the traced
+    // street roof while opening its rear half into the two outdoor strips.
+    const attic=courtyardMaterials(),atticRear=-3.29,atticLeft=-4.75,offset=-1.76;
+    const overhang=.11,roofY=2.47;
+    const gravelCap=standard(0xe8e3da,{map:gravel,bumpMap:gravel,bumpScale:.035});
+    function roofSheet(l,r,z0,z1,h,mat){
+      cap.quad(mat,[[l,h,z0],[r,h,z0],[r,h,z1],[l,h,z1]],[[0,(z1-z0)/1.25],[(r-l)/1.25,(z1-z0)/1.25],[(r-l)/1.25,0],[0,0]]);
+    }
+    roofSheet(-2.81,half,atticRear-overhang,-.86,roofY,metal);
+    roofSheet(atticLeft,-2.81,offset-overhang,-.86,roofY,metal);
+    // The folded roof narrows on its left flank, as on the upper plan.
+    cap.quad(metal,[[-half,0,-.86],[atticLeft,roofY,-.86],[atticLeft,roofY,offset],[-half,0,offset]]);
+    cap.quad(metal,[[-half,0,front],[atticLeft,roofY,-.86],[-half,0,-.86],[-half,0,front]]);
+    cap.quad(metal,[[-half,roofY,-.86],[atticLeft,roofY,-.86],[-half,0,-.86],[-half,roofY,-.86]]);
+    cap.quad(metal,[[half,roofY,atticRear],[half,roofY,-.86],[half,0,front],[half,0,atticRear]]);
+    paneWall(cap,attic,-2.81,half,atticRear,roofY,[[-1.04,.35,.075,2.08],[1.6,3.04,.075,2.08]]);
+    paneWall(cap,attic,atticLeft,-2.81,offset,roofY,[]);
+    cap.quad(attic.render,[[atticLeft,roofY,offset],[atticLeft,roofY,-.86],[atticLeft,0,-.86],[atticLeft,0,offset]]);
+    cap.quad(attic.render,[[-2.81,roofY,atticRear],[-2.81,roofY,offset],[-2.81,0,offset],[-2.81,0,atticRear]]);
+    cap.box(flashing,-2.81,half,roofY-.065,roofY+.018,atticRear-overhang,atticRear+.04);
+    cap.box(flashing,atticLeft,-2.81,roofY-.065,roofY+.018,offset-overhang,offset+.03);
+    cap.box(flashing,half-.085,half+.025,roofY-.08,roofY+.018,atticRear-overhang,-.86);
+
+    // Separate tile, edge and gravel surfaces are visible in the terrace photographs.
+    const courtDeck=-5.20,leftDeck=-5.79;
+    attic.balustrade=standard(0x91b6b0,{transparent:true,opacity:.28,depthWrite:false,metalness:.15,roughness:.23});
+    roofSheet(-half,half,courtDeck,front,-.10,gravelCap);
+    roofSheet(leftReturn,rightReturn,rear,courtDeck,-.10,gravelCap);
+    roofSheet(rightReturn,half,rightOuter,courtDeck,-.10,gravelCap);
+    cap.box(attic.sill,leftReturn,rightReturn,-.15,-.07,rear-.03,rear+.09);
+    terraceTile(cap,attic,leftDeck,4.06,courtDeck,atticRear,.01);
+    terraceTile(cap,attic,leftDeck,atticLeft,atticRear,2.63,.01);
+    terraceTile(cap,attic,atticLeft,-2.81,atticRear,offset,.01);
+    rail(cap,attic,leftDeck,courtDeck,4.06,courtDeck,.025,true);
+    rail(cap,attic,leftDeck,courtDeck,leftDeck,2.63,.025,true);
+    rail(cap,attic,4.06,courtDeck,4.06,atticRear,.025,true);
+    rail(cap,attic,leftDeck,2.63,atticLeft,2.63,.025,true);
+    // Low skylight on the gravel alongside the terrace, visible in the end-on view.
+    cap.box(flashing,1.12,2.44,-.092,.035,rear+.15,rear+1.17);
+    cap.box(attic.frame,1.19,2.37,.035,.085,rear+.21,rear+1.1);
+    cap.box(attic.pane,1.25,2.31,.085,.10,rear+.27,rear+1.04);
+    const seam=standard(0x8c8c81);
+    for(let x=-half+.38;x<half-.1;x+=.59){
+      const across=(a,b,l,r)=>{
+        const za=-.86+(front+.86)*a,zb=-.86+(front+.86)*b,ya=roofY*(1-a)+.022,yb=roofY*(1-b)+.022;
+        cap.quad(seam,[[l,ya,za],[r,ya,za],[r,yb,zb],[l,yb,zb]]);
+      };
+      // Avoid writing a metal seam across either photographed rooflight.
+      const u=(x+half)/(2*half);
+      if((u>.24&&u<.42)||(u>.70&&u<.84)){across(0,.285,x-.009,x+.009);across(.57,1,x-.009,x+.009);}
+      else across(0,1,x-.009,x+.009);
+    }
     // Folded metal side edges and six small projections are visible in the
     // aerial roof photograph. Keep their coordinates in the original roof crop.
     for(const x of [-half+.045,half-.045]){
@@ -159,10 +372,10 @@ window.NSBuildingScene = (() => {
       cap.quad(flashing,frame.xyz);cap.quad(print('roof'),glass.xyz,glass.uv);
     }
     cap.finish();solid(roof,flashing,0,.025,front,14.5,.12,.24);
-    for(const [x,z] of [[-5.65,-4.7],[5.3,-3.8]]){
+    for(const [x,z] of [[-3.81,-1.30],[5.30,-2.67]]){
       solid(roof,metal,x,2.86,z,.62,.78,.83);solid(roof,flashing,x,3.27,z,.74,.1,.96);
     }
-    shells.push(roof);
+    surveySection(roof);shells.push(roof);
     const street=layer(),plinth=standard(0xc2ac89),walk=surfaces(street);
     const streetHeight=x=>.05+(x+half)/(2*half)*1.87;
     const limits=[-14.5,14.5],far=rear-.7,near=front+2.6,curb=front+1.15;
@@ -183,9 +396,25 @@ window.NSBuildingScene = (() => {
     const deck=strip(far,near),baseY=-1.25;
     walk.quad(plinth,[deck[3],deck[2],[hi,baseY,near],[lo,baseY,near]]);
     walk.quad(plinth,[deck[2],deck[1],[hi,baseY,far],[hi,baseY,near]]);
+    walk.quad(plinth,[deck[1],deck[0],[lo,baseY,far],[hi,baseY,far]]);
+    walk.quad(plinth,[deck[0],deck[3],[lo,baseY,near],[lo,baseY,far]]);
     walk.finish();
     solid(street,standard(0x715b41,{metalness:.24}),0,baseY-.07,(near+far)/2,hi-lo+.1,.14,near-far+.1);
     solid(street,standard(0xbaa075,{metalness:.30}),0,baseY-.19,(near+far)/2,hi-lo-.25,.11,near-far-.25);
+    // Fold the two display wings back to the house footprint as the neighbours
+    // leave the view. The centre pavement and the documented slope stay fixed.
+    const wings=[];
+    street.traverse(node=>{
+      if(!node.geometry)return;
+      const g=node.geometry,points=g.getAttribute('position'),folded=points.clone();
+      for(let i=0;i<points.count;i++){
+        const x=points.getX(i),y=points.getY(i),inside=Math.max(-8.12,Math.min(8.12,x));
+        folded.setX(i,inside);
+        // Pavement, kerb and the plinth's top edge are attached to street level.
+        if(Math.abs(y+node.position.y-streetHeight(x))<.30)folded.setY(i,y+(inside-x)*(1.87/(2*half)));
+      }
+      g.morphAttributes.position=[folded];node.updateMorphTargets();wings.push(node);
+    });
     // Adjacent facades are photographic context from the same street photograph.
     const neighbors=layer(),context=surfaces(neighbors);
     for(const [l,r,hi,key] of [[-13.0,-half,10.5,'soused-vlevo'],[half,13.0,14.22,'soused-vpravo']]){
@@ -212,7 +441,11 @@ window.NSBuildingScene = (() => {
       }
       const side=standard(0xc2b7a4),outer=l<0?l:r;
       context.quad(side,[[outer,hi,z],[outer,hi,-4],[outer,streetHeight(outer),-4],[outer,streetHeight(outer),z]]);
-      context.quad(side,[[l,hi,-4],[r,hi,-4],[r,hi,z],[l,hi,z]]);
+      context.quad(side,[[r,hi,-4],[l,hi,-4],[l,streetHeight(l),-4],[r,streetHeight(r),-4]]);
+      const roofMat=standard(l<0?0x8e7a6d:0xa27b6a),peak=l<0?hi+1.50:hi+1.12,ridgeZ=z-3.4;
+      context.quad(roofMat,[[l,peak,ridgeZ],[r,peak,ridgeZ],[r,hi,z],[l,hi,z]]);
+      context.quad(roofMat,[[l,hi,-4],[r,hi,-4],[r,peak,ridgeZ],[l,peak,ridgeZ]]);
+      context.quad(side,[[outer,hi,-4],[outer,peak,ridgeZ],[outer,hi,z],[outer,hi,-4]]);
     }
     context.finish();
     const shadowMat=new T.ShadowMaterial({opacity:.20}),ground=new T.Mesh(new T.PlaneGeometry(160,160),shadowMat);
@@ -220,6 +453,11 @@ window.NSBuildingScene = (() => {
     const trim=standard(0xb58448,{metalness:.30,roughness:.38}),focus=layer();
     solid(focus,trim,0,0,front+.06,14.28,.10,.16);
     solid(focus,trim,half+.02,0,(front+rear)/2,.09,.085,front-rear);
+    const rearGuide=surfaces(focus);
+    rearGuide.box(trim,leftReturn,rightReturn,-.024,.057,rear-.077,rear+.023);
+    rearGuide.box(trim,rightReturn,half,-.024,.057,rightOuter-.077,rightOuter+.02);
+    rearGuide.quad(trim,[[leftReturn,.057,leftInner-.035],[-half,.057,leftCorner-.035],[-half,-.024,leftCorner-.035],[leftReturn,-.024,leftInner-.035]]);
+    rearGuide.finish();
     // Perimeters sampled from the alpha masks of the six architectural sheets
     // on a 120-cell grid. The two maisonette levels have different plate shapes.
     const typical=[[0,25],[0,119],[119,119],[119,4],[95,4],[94,0],[29,0],[27,30]];
@@ -332,7 +570,9 @@ window.NSBuildingScene = (() => {
         walls.finish();
         const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(capPositions,3));g.computeVertexNormals();
         const mesh=new T.Mesh(g,coping);mesh.castShadow=true;mesh.receiveShadow=true;envelope.add(mesh);
-        units.push({id:part.k.replace('-horni','').replace('-','.'),unit,paper,envelope,interior:furnishings(unit,part)});
+        const interior=furnishings(unit,part);
+        surveySection(paper);surveySection(envelope);surveySection(interior);
+        units.push({id:part.k.replace('-horni','').replace('-','.'),unit,paper,envelope,interior});
       }
       floors.set(n,{group,units});return floors.get(n);
     }
@@ -343,23 +583,24 @@ window.NSBuildingScene = (() => {
       if(!group.visible)return;
       if(!layers.has(group)){
         const mats=new Set(),casters=[];group.traverse(obj=>{if(obj.material)mats.add(obj.material);if(obj.castShadow)casters.push(obj);});
-        layers.set(group,{materials:[...mats].map(m=>[m,m.transparent]),casters});
+        layers.set(group,{materials:[...mats].map(m=>[m,m.transparent,m.opacity,m.depthWrite]),casters});
       }
       const {materials,casters}=layers.get(group);
       for(const obj of casters)obj.castShadow=amount>.52;
-      for(const [m,inherent] of materials){
+      for(const [m,inherent,opacity,depthWrite] of materials){
         const transparent=inherent||amount<.995;
         if(m.transparent!==transparent){m.transparent=transparent;m.needsUpdate=true;}
-        m.opacity=amount;m.depthWrite=amount>.69;
+        m.opacity=amount*opacity;m.depthWrite=depthWrite&&amount>.69;
       }
     }
-    let lost=false,dusk=0,previousSize='',previousLight=-1,ready=false;
+    let keyAngle=null,keyDusk=null;
+    let lost=false,dusk=0,previousSize='',previousLight=-1,ready=false,entrySide=1;
     canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;canvas.hidden=true;repaint();});
     host.prepend(canvas);
-    function render(s,{w,h,dpr,cutLevel,level,visibleApartment,hoverFloor,light,quiet}){
+    function render(s,{w,h,dpr,cutLevel,level,visibleApartment,hoverFloor,light,quiet,transfer}){
       if(lost)return false;
       if(!ready){
-        ready=['front','roof','brick','cihla-relief','dlazba','soused-vlevo','soused-vpravo'].every(key=>textures.get(key)?.image?.naturalWidth);
+        ready=['front','roof','brick','cihla-relief','dlazba','soused-vlevo','soused-vpravo','odraz-dvur','omitka-dvur','strk-strecha'].every(key=>textures.get(key)?.image?.naturalWidth);
         if(!ready)return false;
         canvas.hidden=false;
       }
@@ -375,55 +616,81 @@ window.NSBuildingScene = (() => {
       if(dusk!==previousLight){
         fill.color.setRGB(.98-.23*dusk,.97-.18*dusk,1-.05*dusk);
         fill.intensity=1.42-.31*dusk;sun.color.setRGB(1,.94-.44*dusk,.82-.50*dusk);
-        sun.intensity=1.72+.45*dusk;sun.position.set(-18-12*dusk,32-17*dusk,24);
+        sun.intensity=1.72+.45*dusk;
         bounce.intensity=.54+.23*dusk;
         for(const pane of glazing)pane.emissive.setRGB(.43*dusk,.245*dusk,.08*dusk);
+        for(const pane of courtGlass)pane.emissive.setRGB(.045+.24*dusk,.044+.15*dusk,.039+.065*dusk);
         previousLight=dusk;
       }
-      alpha(street,1-s.cut);alpha(neighbors,(1-s.cut)*Math.max(0,1-s.spread*.85));
+      const clamp=v=>Math.max(0,Math.min(1,v)),smooth=v=>v*v*(3-2*v);
+      if(!s.cut&&s.spread<.015)entrySide=ca<0?-1:1;
+      const axis=transfer?transfer.elevation:cutLevel;
+      const phase=transfer?clamp(transfer.progress):0;
+      function strength(n){
+        if(!cutLevel||!n)return 0;
+        if(!transfer)return n===cutLevel?1:0;
+        return Math.max(n===transfer.from?1-phase:0,n===transfer.to?phase:0,smooth(clamp(1-Math.abs(n-axis))));
+      }
+      // The adjoining buildings are part of the documented street elevation.
+      // As the lens passes their party walls, show the residence in section.
+      const streetView=smooth(clamp((ca-.05)/.62));
+      const sideCut=!cutLevel?smooth(clamp((.55-Math.abs(ca))/.5)):0;
+      const display=1-streetView;
+      for(const wing of wings)wing.morphTargetInfluences[0]=display;
+      const key=(cutLevel?entrySide:ca),keyPosition=smooth(clamp((key+.68)/1.36));
+      if(keyAngle!==keyPosition||keyDusk!==dusk){
+        sun.position.set(-17-11*dusk,32-17*dusk,-23+47*keyPosition);
+        bounce.position.set(14,13,15-30*keyPosition);keyAngle=keyPosition;keyDusk=dusk;
+      }
+      surveyPlane.value.set(sa<0?1:-1,7.5-5.15*sideCut);
+      alpha(street,1-s.cut);alpha(neighbors,(1-s.cut)*Math.max(0,1-s.spread*.85)*streetView);
       ground.visible=s.cut<.96;shadowMat.opacity=.125*(1-s.cut);
       const peel=Math.min(1,s.spread*.62+s.cut*1.4);
       const separation=Math.min(1,Math.max(0,(s.spread-.10)/1.2));
       if(cutLevel && (s.cut>.001||s.spread>.01))buildPlan(cutLevel);
-      if(cutLevel && separation>.02 && s.cut<.72){
-        // Populate neighbouring cutaways over successive frames. Their real plans
-        // replace the opaque block tops as daylight enters the split model.
-        const next=[1,2,3,4].find(n=>!floors.has(n));
-        if(next){buildPlan(next);repaint();}
+      if(transfer){buildPlan(transfer.from);buildPlan(transfer.to);}
+      if((cutLevel&&separation>.02&&s.cut<.75)||sideCut>.02){
+        const next=[1,2,3,4,5].find(n=>!floors.has(n));if(next){buildPlan(next);repaint();}
       }
+      const offset=n=>entrySide*s.spread*(.74*strength(n)-.38*clamp(n-axis));
+      const lift=n=>(n?floorY(n):0)+(n?s.spread*(n-axis)*.95:0);
       for(let n=0;n<shells.length;n++){
-        const shell=shells[n],selected=n===cutLevel&&cutLevel>0;
-        shell.position.y=(n?floorY(n):0)+(n?s.spread*(n-cutLevel)*.95:0);
-        shell.position.z=selected?1.85*s.spread/2.5:(n>cutLevel?-s.spread*.38:0);
+        const shell=shells[n],weight=strength(n),remove=peel*weight;
+        shell.position.y=lift(n);shell.position.z=offset(n);
+        const remain=Math.pow(1-s.cut,1.15+.50*clamp(n-axis));
         if(shell.userData.facade){
-          const {facade,body,lid}=shell.userData;
-          // Separate the photographed face from its floor plate like a removable
-          // model panel. The adjacent floors keep their own facades as references.
-          facade.position.set(selected?-1.55*peel:0,selected?-.34*peel:0,selected?2.60*peel:0);
-          facade.rotation.y=selected?-.105*peel:0;
-          alpha(facade,selected?(1-s.cut)*(1-.89*peel):Math.pow(1-s.cut,n>cutLevel?1.65:1.15));
-          const remain=Math.pow(1-s.cut,n>cutLevel?1.65:1.15);
+          const {facade,back,body,lid}=shell.userData;
+          for(const [panel,side] of [[facade,1],[back,-1]]){
+            const shift=entrySide===side?remove:0;
+            panel.position.set(-side*1.25*shift,-.26*shift,side*2.4*shift);
+            panel.rotation.y=-side*.09*shift;
+            const selectedAlpha=(1-s.cut)*(1-(side===entrySide?.89:.54)*peel);
+            alpha(panel,remain+(selectedAlpha-remain)*weight);
+          }
           const secondary=n>0&&floors.has(n)?separation:0;
-          alpha(body,selected?(1-s.cut)*Math.pow(1-peel,2):remain*(1-.69*secondary));
-          alpha(lid,selected?(1-s.cut)*Math.pow(1-peel,2):remain*(1-secondary));
+          const selectedAlpha=(1-s.cut)*Math.pow(1-peel,2);
+          const bodyAlpha=remain*(1-.64*secondary),lidAlpha=remain*(1-secondary);
+          alpha(body,(bodyAlpha+(selectedAlpha-bodyAlpha)*weight)*(1-.94*sideCut));
+          alpha(lid,(lidAlpha+(selectedAlpha-lidAlpha)*weight)*(1-.75*sideCut));
         }else{
-          if(selected){shell.position.y+=2.5*peel;shell.position.z-=1.7*peel;}
-          alpha(shell,Math.pow(1-s.cut,selected?3:n>cutLevel?1.65:1.15));
+          shell.position.y+=2.5*remove;shell.position.z-=entrySide*1.7*remove;
+          alpha(shell,remain+(Math.pow(1-s.cut,3)-remain)*weight);
         }
       }
-      const lit=hoverFloor||cutLevel;focus.visible=!!lit&&s.cut<.88;
-      if(focus.visible){focus.position.set(0,floorY(lit)+s.spread*(lit-cutLevel)*.95+.04,lit===cutLevel?1.85*s.spread/2.5:0);alpha(focus,1-s.cut);}
+      const lit=hoverFloor||axis;focus.visible=!!lit&&s.cut<.88;
+      if(focus.visible){
+        focus.position.set(0,floorY(lit)+s.spread*(lit-axis)*.95+.04,offset(lit));
+        alpha(focus,1-s.cut);
+      }
       for(const [n,{group,units}] of floors){
-        const selected=n===cutLevel;
-        const reveal=selected?Math.min(1,s.spread*.70+s.cut*5):n===5?0:separation*Math.pow(1-s.cut,1.7);
-        group.visible=!!cutLevel&&reveal>.012;if(!group.visible)continue;
-        group.position.z=selected?1.85*s.spread/2.5:n>cutLevel?-s.spread*.38:0;
-        group.position.y=floorY(n)+s.spread*(n-cutLevel)*.95;
-        // Near the vertical view the model joins the architect's flat drawing.
-        // Tilting back reveals furniture at the locations printed on that drawing.
-        const inclination=Math.max(0,Math.min(1,(Math.PI/2-s.tilt)/.28));
+        const weight=strength(n),primary=Math.min(1,s.spread*.70+s.cut*5);
+        const secondary=sideCut||((n===5?0:separation)*Math.pow(1-s.cut,1.7));
+        const reveal=secondary+(primary-secondary)*weight;
+        group.visible=reveal>.012;if(!group.visible)continue;
+        group.position.z=offset(n);group.position.y=lift(n);
+        const inclination=clamp((Math.PI/2-s.tilt)/.28);
         for(const {id,unit,paper,envelope,interior} of units){
-          unit.visible=!(selected&&visibleApartment&&id!==visibleApartment&&n===2);
+          unit.visible=!(!transfer&&weight===1&&visibleApartment&&id!==visibleApartment&&n===2);
           if(!unit.visible)continue;
           unit.scale.y=.12+.88*reveal;
           envelope.scale.y=.26+.74*inclination;

@@ -6,7 +6,19 @@
   const panel=walk.querySelector('.walk-list'),map=el('[data-walk-map]'),dot=el('.walk-dot');
   const calm=matchMedia('(prefers-reduced-motion: reduce)');
   let unit='',index=0,edition=0,activeImage=null,trigger=null,gesture=null;
-  let transitions=[];
+  let transitions=[],flight=null,entryGate=Promise.resolve(),travel=0,raf=0,closing=false;
+  let paper=null,entryOrigin=null;
+  function fly(to,duration){
+    cancelAnimationFrame(raf);
+    if(!flight?.render||calm.matches){travel=to;return;}
+    const start=performance.now(),from=travel;let last=-100;
+    function frame(now){
+      const t=Math.min(1,(now-start)/duration);
+      if(now-last>=32||t===1){travel=from+(to-from)*t;flight.render(travel);last=now;}
+      if(t<1)raf=requestAnimationFrame(frame);
+    }
+    raf=requestAnimationFrame(frame);
+  }
   const twoDigits=n=>String(n).padStart(2,'0');
 
   function stopMovement(){
@@ -24,6 +36,7 @@
     });
   }
   async function showPhoto(i,direction,origin){
+    if(closing)return;
     const shots=views[unit];
     index=(i+shots.length)%shots.length;
     const number=index,view=shots[index],ticket=++edition;
@@ -37,11 +50,22 @@
     const cut=unit.replace('.','-')+(view.floor===5?'-horni':'');
     map.src='assets/model/cut-'+cut+'.webp';
     map.alt='Půdorys bytu '+unit+', '+view.floor+'. NP';
+    const mapBox=map.parentElement;
+    const focusedPin=mapBox.contains(document.activeElement)?document.activeElement.dataset.walkMini:null;
+    mapBox.querySelectorAll('button.walk-map-pin').forEach(b=>b.remove());
+    shots.forEach((room,j)=>{
+      if(room.floor!==view.floor||!room.point)return;
+      const b=document.createElement('button');b.type='button';b.className='walk-map-pin';b.dataset.walkMini=String(j);
+      b.setAttribute('aria-label','Zobrazit místnost – '+room.label);b.setAttribute('aria-pressed',String(j===number));
+      b.style.left=room.point[0]*100+'%';b.style.top=room.point[1]*100+'%';
+      b.onclick=()=>{if(j!==index&&!closing)showPhoto(j,j>index?1:-1);};mapBox.append(b);
+    });
+    if(focusedPin!=null)mapBox.querySelector('[data-walk-mini="'+focusedPin+'"]')?.focus({preventScroll:true});
     dot.hidden=!view.point;
     if(view.point){dot.style.left=view.point[0]*100+'%';dot.style.top=view.point[1]*100+'%';}
     Array.from(panel.children).forEach((b,j)=>b.setAttribute('aria-pressed',String(j===number)));
-    try{await next.decode();}catch{if(ticket===edition)el('#walk-title').textContent='Fotografii se nepodařilo načíst.';return;}
-    if(ticket!==edition||!walk.open)return;
+    try{await Promise.all([next.decode(),origin?entryGate:Promise.resolve()]);}catch{if(ticket===edition)el('#walk-title').textContent='Fotografii se nepodařilo načíst.';return;}
+    if(ticket!==edition||!walk.open||closing)return;
     stopMovement();
     const old=activeImage;
     stage.replaceChildren(...[old||entrySheet,next].filter(Boolean));
@@ -62,14 +86,18 @@
     const b=e.target.closest('[data-enter-unit]');
     if(!b||!views[b.dataset.enterUnit]?.length)return;
     const rect=b.getBoundingClientRect(),model=el('[data-house-model]');
-    const source=model.getBoundingClientRect(),paper=document.createElement('canvas');
+    const source=model.getBoundingClientRect();paper=document.createElement('canvas');
     paper.className='walk-floor-print';paper.setAttribute('aria-hidden','true');
     model.dispatchEvent(new CustomEvent('capture-floor',{detail:{canvas:paper}}));
     trigger=b;unit=b.dataset.enterUnit;
     const list=views[unit];
     let i=b.dataset.walkPhoto?list.findIndex(s=>s.photo===b.dataset.walkPhoto):list.findIndex(s=>s.floor===Number(b.dataset.floor));
     if(i<0)i=0;
-    activeImage=null;stage.replaceChildren(paper);bindRooms();
+    closing=false;travel=0;activeImage=null;stage.replaceChildren(paper);bindRooms();
+    flight={canvas:paper,unit,point:list[i].point};
+    model.dispatchEvent(new CustomEvent('room-camera',{detail:flight}));
+    entryGate=flight.render&&!calm.matches?new Promise(resolve=>setTimeout(resolve,340)):Promise.resolve();
+    fly(1,1000);
     el('#walk-title').textContent=list[i].label;
     walk.showModal();document.body.classList.add('walk-open');
     el('[data-walk-close]').focus({preventScroll:true});
@@ -78,7 +106,7 @@
     const v=b.classList.contains('room-pin')?(rect.top+rect.height/2-source.top)/source.height:.5;
     const x=box.left+box.width/2+(u-.5)*source.width*ratio;
     const y=box.top+box.height/2+(v-.5)*source.height*ratio;
-    showPhoto(i,1,{x,y});
+    entryOrigin={x,y};showPhoto(i,1,entryOrigin);
   });
   panel.addEventListener('click',e=>{
     const b=e.target.closest('[data-walk-room]');
@@ -98,10 +126,25 @@
     if(Math.abs(dx)<42||Math.abs(dx)<Math.abs(dy)*1.4)return;
     const d=dx<0?1:-1;showPhoto(index+d,d);
   });
-  el('[data-walk-close]').addEventListener('click',()=>walk.close());
+  function returnToPlan(){
+    if(closing||!walk.open)return;
+    closing=true;edition++;stopMovement();cancelAnimationFrame(raf);
+    if(!activeImage||calm.matches||!activeImage.animate){walk.close();return;}
+    stage.replaceChildren(paper,activeImage);fly(0,530);
+    const bounds=stage.getBoundingClientRect();
+    const x=Math.max(0,Math.min(bounds.width,entryOrigin.x-bounds.left));
+    const y=Math.max(0,Math.min(bounds.height,entryOrigin.y-bounds.top));
+    const dest=x+'px '+y+'px';
+    const exit=activeImage.animate([{clipPath:'circle(150% at '+dest+')'},{clipPath:'circle(0% at '+dest+')'}],
+      {duration:520,easing:'cubic-bezier(.4,0,.3,1)',fill:'forwards'});
+    exit.finished.then(()=>{if(walk.open)walk.close();}).catch(()=>{});
+  }
+  el('[data-walk-close]').addEventListener('click',returnToPlan);
+  walk.addEventListener('cancel',e=>{e.preventDefault();returnToPlan();});
   walk.addEventListener('close',()=>{
-    edition++;stopMovement();document.body.classList.remove('walk-open');
-    stage.replaceChildren();activeImage=null;gesture=null;trigger?.focus({preventScroll:true});
+    edition++;cancelAnimationFrame(raf);flight?.restore?.();flight=null;paper=null;
+    stopMovement();document.body.classList.remove('walk-open');
+    stage.replaceChildren();activeImage=null;gesture=null;closing=false;trigger?.focus({preventScroll:true});
   });
 }
 
