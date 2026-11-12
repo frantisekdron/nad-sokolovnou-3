@@ -11,7 +11,7 @@ window.NS3Model = (() => {
   const floorHeight=2.92, halfWidth=7.1, front=7.6, rear=-7.45;
   const unitId=k=>k.replace('-horni','').replace('-','.');
   const base=new URL('assets/model/',document.baseURI);
-  function mount(target,onFloor,onApartment) {
+  function mount(target,onFloor,onApartment,onArrival) {
     const host=target.matches('[data-house-model]')?target:target.querySelector('[data-house-model]');
     if(!host)throw new Error('Chybí prostor pro model domu.');
     host.classList.add('ns-studio');
@@ -21,7 +21,8 @@ window.NS3Model = (() => {
     const caption=host.querySelector('.ns-view-name'), reduced=matchMedia('(prefers-reduced-motion: reduce)');
     let w=1,h=1,dpr=1, cache={},scheduled=0, level=0, apartment=null, overhead=false, azClosed=-.34, cutLevel=0, hit=[], unitHit=[];
     const state={az:azClosed,tilt:rad(20),ty:7.8,tx:0,tz:0,coverage:.84,spread:0,cut:0};
-    let motion=null, hoverFloor=0;
+    let motion=null, hoverFloor=0, visibleApartment=null;
+    const travelTrack=target.parentElement;
     const labelNodes=[];
     for(let n=1;n<=5;n++){
       const b=document.createElement('button');b.type='button';b.textContent=n+'. NP';b.dataset.modelFloor=n;b.setAttribute('aria-label',n+'. NP – otevřít podlaží');b.setAttribute('aria-pressed','false');
@@ -35,7 +36,7 @@ window.NS3Model = (() => {
     function paintSoon(){if(!scheduled)scheduled=requestAnimationFrame(()=>{scheduled=0;paint();});}
     function sizing(){
       const box=canvas.getBoundingClientRect();if(!box.width||!box.height)return;
-      w=box.width;h=box.height;dpr=Math.min(window.devicePixelRatio||1,2);
+      w=box.width;h=box.height;dpr=Math.min(window.devicePixelRatio||1,1.7);
       canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
       if(level&&!motion)Object.assign(state,targetCamera());
       paintSoon();
@@ -52,18 +53,18 @@ window.NS3Model = (() => {
       }
       return r.map(k=>({k,width:14,left:-7,depth:14*GEOMETRY[k].height/GEOMETRY[k].width}));
     }
-    const angle=()=>overhead?rad(90):rad(61);
+    const angle=()=>overhead?rad(90):rad(52);
     function targetCamera() {
       if(!level)return closedCamera();
       let parts=planParts();
       if(apartment&&level===2)parts=parts.filter(p=>unitId(p.k)===apartment);
       const lo=Math.min(...parts.map(p=>p.left)),hi=Math.max(...parts.map(p=>p.left+p.width));
       const depth=Math.max(...parts.map(p=>p.depth));
-      const tilt=angle(), az=overhead?0:-.11;
+      const tilt=angle(), az=overhead?0:-.29;
       const footprintW=(hi-lo)*Math.cos(az)+depth*Math.abs(Math.sin(az));
       const footprintH=((hi-lo)*Math.abs(Math.sin(az))+depth*Math.cos(az))*Math.sin(tilt)+1.4*Math.cos(tilt);
       const minDim=Math.min(w,h);
-      const maxW=w*.85,maxH=h*.70;
+      const maxW=w*.84,maxH=h*.80;
       const fit=Math.min(maxW/footprintW,maxH/footprintH);
       return {az,tilt,ty:floorY(level)+.48,tx:(hi+lo)/2,tz:front-depth/2,coverage:fit/(minDim*.045),spread:0,cut:1};
     }
@@ -73,52 +74,84 @@ window.NS3Model = (() => {
     function blend(from,to,t){
       for(const key of Object.keys(state))state[key]=mix(from[key],to[key],t);
     }
+    // Keep the cutaway in the selected slab's world coordinates. The lens
+    // orbits above it, then moves closer while the other floors clear the view.
+    const quietControl=target.closest('.model-sheet').querySelector('[data-camera-motion]');
+    let quiet=reduced.matches;
+    function syncMotionControl(){
+      quietControl.checked=!quiet;
+    }
+    syncMotionControl();
+    quietControl.addEventListener('change',()=>{quiet=!quietControl.checked;});
+    function openingPose(start,dest,n,t,soft){
+      const split=ease((t-.035)/.30);
+      const overheadTurn=ease((t-.26)/.43);
+      const unveil=ease((t-.32)/.36);
+      const approach=ease((t-.60)/.40);
+      const strength=soft?.43:1;
+      const mid={...closedCamera(),az:azClosed-.23*strength,tilt:rad(24),
+        ty:8.7+(3-n)*1.6*strength,coverage:.67,spread:2.5*strength};
+      const distant={...dest,coverage:dest.coverage*(soft?.78:.54),tilt:rad(84),az:-.06};
+      blend(start,mid,split);
+      for(const key of ['az','tilt','ty','tx','tz','coverage']){
+        state[key]=mix(mix(state[key],distant[key],overheadTurn),dest[key],approach);
+      }
+      state.spread=mid.spread*split*(1-approach);
+      state.cut=unveil;
+      return t<.30?'separate':t<.62?'overhead':'dive';
+    }
     function animateTo(kind){
-      const from={...state}, reducedMotion=reduced.matches;
-      const returnTime=kind==='open' && (state.cut>.015 || state.spread>.02) && !reducedMotion ? 620 : 0;
-      motion={kind,from,since:performance.now(),returnTime,reducedMotion};
-      host.dataset.pose='moving';canvas.style.opacity='1';
+      const from={...state};
+      const returnTime=kind==='open'&&(state.cut>.015||state.spread>.02)?(quiet?310:720):0;
+      motion={kind,from,since:performance.now(),returnTime,soft:quiet,
+        oldFloor:cutLevel};
+      host.dataset.pose='moving';host.dataset.phase=kind==='close'?'return':'separate';
       paintSoon();
     }
+    // Compute the camera, drawing, and interaction state from one clock.
     function updateMotion(now){
       if(!motion)return;
-      const {kind,from,since,returnTime,reducedMotion}=motion;
+      const {kind,from,since,returnTime,soft}=motion;
       const elapsed=Math.max(0,now-since),dest=targetCamera(),closed=closedCamera();
       if(elapsed<returnTime){
-        host.dataset.phase='return';
-        blend(from,closed,ease(elapsed/returnTime));
-        return;
+        host.dataset.phase='return';blend(from,closed,ease(elapsed/returnTime));return;
       }
-      const duration=reducedMotion?400:kind==='open'?2320:kind==='close'?1050:520;
+      const duration=kind==='open'?(soft?1450:3550):kind==='close'?(soft?600:1500):soft?360:660;
       const t=Math.min(1,(elapsed-returnTime)/duration);
-      if(reducedMotion){
-        canvas.style.opacity=String(.12+.88*Math.abs(1-2*t));
-        host.dataset.phase='dissolve';
-        if(t>=.5){if(level)cutLevel=level;Object.assign(state,dest);}
-      }else if(kind==='open'){
-        cutLevel=level;
-        const exploded={...closed,az:azClosed-.14,tilt:rad(30),ty:8.8+(3-level)*1.85,coverage:.64,spread:2.35};
-        host.dataset.phase=t<.37?'separate':t<.76?'reveal':'settle';
-        if(t<.37)blend(returnTime?closed:from,exploded,ease(t/.37));
-        else {
-          blend(exploded,dest,ease((t-.37)/.63));
-          state.spread=exploded.spread*(1-ease((t-.58)/.42));
-          state.cut=ease((t-.38)/.44);
+      travelTrack.style.setProperty('--journey',String(kind==='close'?1-t:t));
+      if(kind==='open'){
+        cutLevel=level;visibleApartment=apartment;
+        const phase=openingPose(returnTime?closed:from,dest,level,t,soft);
+        if(host.dataset.phase!==phase){
+          caption.textContent=level+'. NP / '+(phase==='overhead'?'Pohled nad patro':phase==='dive'?'Přiblížení půdorysu':'Otevření domu');
+          host.dataset.phase=phase;
         }
+      }else if(kind==='close' && motion.oldFloor && from.cut>.965){
+        host.dataset.phase='return';
+        openingPose(closed,from,motion.oldFloor,1-t,soft);
       }else{
-        host.dataset.phase=kind;
+        host.dataset.phase=kind==='close'?'return':'detail';
         blend(from,dest,ease(t));
       }
       if(t>=1){
         Object.assign(state,dest);cutLevel=level;motion=null;
-        host.dataset.pose=level?'plan':'house';delete host.dataset.phase;canvas.style.opacity='1';
+        host.dataset.pose=level?'plan':'house';delete host.dataset.phase;
+        if(kind==='open'&&level){caption.textContent=level+'. NP / půdorys';tools.hidden=false;onArrival?.(level);}
+        if(kind==='close'){labels.hidden=false;onArrival?.(0);}
       }
+    }
+    let cosAz=1,sinAz=0,cosTilt=1,sinTilt=0,scale=1,eyeDistance=70;
+    function prepareLens(){
+      cosAz=Math.cos(state.az);sinAz=Math.sin(state.az);
+      cosTilt=Math.cos(state.tilt);sinTilt=Math.sin(state.tilt);
+      scale=Math.min(w,h)*.045*state.coverage;
+      eyeDistance=Math.max(27,1/(.015*state.coverage));
     }
     function proj(p){
       const x=p[0]-state.tx,y=p[1]-state.ty,z=p[2]-state.tz;
-      const ca=Math.cos(state.az),sa=Math.sin(state.az),ct=Math.cos(state.tilt),st=Math.sin(state.tilt);
-      const u=x*ca+z*sa,d=z*ca-x*sa,sc=Math.min(w,h)*.045*state.coverage;
-      return [w*(.47+.03*state.cut)+u*sc,h*(.53-.015*state.cut)+(-y*ct+d*st)*sc,y*st+d*ct];
+      const u=x*cosAz+z*sinAz,d=z*cosAz-x*sinAz,depth=y*sinTilt+d*cosTilt;
+      const lens=scale*eyeDistance/Math.max(6,eyeDistance-depth);
+      return [w*.50+u*lens,h*.515+(-y*cosTilt+d*sinTilt)*lens,depth];
     }
     function path2(points){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();}
     function flat(poly,fill,stroke){
@@ -129,10 +162,19 @@ window.NS3Model = (() => {
       const q=poly.map(proj);ctx.save();path2((clip||poly).map(proj));ctx.clip();
       if(ready(img)){
         const [sx,sy,sw,sh]=crop||[0,0,img.naturalWidth,img.naturalHeight];
-        const [a,b,,d]=q;ctx.transform((b[0]-a[0])/sw,(b[1]-a[1])/sw,(d[0]-a[0])/sh,(d[1]-a[1])/sh,a[0],a[1]);
-        ctx.drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
-        if(tint){ctx.fillStyle=tint;ctx.fillRect(0,0,sw,sh);}
-      }else{ctx.fillStyle='#bec0b1';ctx.fillRect(0,0,w,h);}
+        // Map each triangle of the quad separately; a single affine image
+        // leaves gaps at the facade corners as the perspective lens turns.
+        const [a,b,c,d]=q;
+        const triangle=(origin,horizontal,vertical,clipPoints)=>{
+          ctx.save();path2(clipPoints);ctx.clip();
+          ctx.transform(horizontal[0]/sw,horizontal[1]/sw,vertical[0]/sh,vertical[1]/sh,origin[0],origin[1]);
+          ctx.drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
+          if(tint){ctx.fillStyle=tint;ctx.fillRect(0,0,sw,sh);}
+          ctx.restore();
+        };
+        triangle(a,[b[0]-a[0],b[1]-a[1]],[d[0]-a[0],d[1]-a[1]],[a,b,d]);
+        triangle([b[0]+d[0]-c[0],b[1]+d[1]-c[1]],[c[0]-d[0],c[1]-d[1]],[c[0]-b[0],c[1]-b[1]],[b,c,d]);
+      }else{ctx.fillStyle='#b8ab91';ctx.fillRect(0,0,w,h);}
       ctx.restore();
     }
     function plane(x0,x1,z0,z1,y){return [[x0,y,z0],[x1,y,z0],[x1,y,z1],[x0,y,z1]];}
@@ -153,13 +195,6 @@ window.NS3Model = (() => {
       face(poly,asset('front'),[0,a,960,b-a],null);
       if(state.spread>.01){
         flat(plane(-halfWidth,halfWidth,rear,front,top),'#c7bba2','#8d826e');
-        // The exposed slab carries the actual drawing for the floor above it.
-        if(n+1===cutLevel){
-          for(const part of planParts(cutLevel)){
-            const drawing=asset('cut-'+part.k);
-            if(ready(drawing))face(plane(part.left,part.left+part.width,front-part.depth,front,top+.012),drawing,null,'rgba(213,194,156,.12)');
-          }
-        }
       }
       if(n===hoverFloor && !level || n===cutLevel && level && state.spread>.02){
         flat(poly,'rgba(220,174,87,.26)','#765325');
@@ -208,11 +243,11 @@ window.NS3Model = (() => {
       flat([[halfWidth,streetHeight(halfWidth),far],[xx,streetHeight(xx),far],[xx,streetHeight(xx),front],[halfWidth,streetHeight(halfWidth),front]],'#c6c2b0','#aba693');
     }
     function cutaway(){
-      if(!cutLevel || state.cut<.008)return;
+      if(!cutLevel || (state.cut<.008 && state.spread<.01))return;
       let parts=planParts(cutLevel);
       const oy=floorY(cutLevel);
       parts.forEach(part=>{
-        const alpha=state.cut*(level===2 && apartment && unitId(part.k)!==apartment?0:1);
+        const alpha=Math.min(1,4*state.cut+.32*state.spread)*(cutLevel===2 && visibleApartment && unitId(part.k)!==visibleApartment?0:1);
         if(alpha<.008)return;
         const geo=GEOMETRY[part.k],z0=front-part.depth,lift=.18+.59*ease(state.cut);
         const world=(p,y)=>[part.left+p[0]*part.width,y,z0+p[1]*part.depth];
@@ -236,18 +271,18 @@ window.NS3Model = (() => {
       });
     }
     function paint() {
-      const now=performance.now();updateMotion(now);
+      const now=performance.now();updateMotion(now);prepareLens();
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);hit=[];unitHit=[];
       const shadowX=w*.48,shadowY=h*.83;
       ctx.save();ctx.translate(shadowX,shadowY);ctx.scale(w*.34,h*.06);const shadow=ctx.createRadialGradient(0,0,.02,0,0,1);
       shadow.addColorStop(0,'rgba(75,62,38,'+(.27*(1-state.cut))+')');shadow.addColorStop(1,'rgba(75,62,38,0)');ctx.fillStyle=shadow;ctx.fillRect(-1,-1,2,2);ctx.restore();
       const houseAlpha=1-state.cut;
-      if(houseAlpha>.008 || state.spread>.001){
-        ctx.save();ctx.globalAlpha=houseAlpha;podium();ctx.restore();
-        for(let n=1;n<=5;n++)floorGroup(n,n===cutLevel?houseAlpha*houseAlpha:houseAlpha);
+      if(houseAlpha>.008){ctx.save();ctx.globalAlpha=houseAlpha;podium();ctx.restore();}
+      for(let n=1;n<=5;n++){
+        if(n===cutLevel)cutaway();
+        if(houseAlpha>.008)floorGroup(n,n===cutLevel?houseAlpha*houseAlpha:houseAlpha);
       }
-      cutaway();
-      if(!level && state.cut<.18){
+      if(!level && !motion && state.cut<.18){
         let last=h*.09-25;
         for(let n=5;n>=1;n--){const y=floorY(n)+floorHeight*.48;
           const p=proj([halfWidth+.1,y,n===5?2:front-.2]);
@@ -262,10 +297,10 @@ window.NS3Model = (() => {
     function changeLevel(n,unit=null){
       n=Number(n);if(!byFloor[n])return;
       level=n;hoverFloor=0;if(!cutLevel)cutLevel=n;apartment=unit&&byFloor[n].some(k=>unitId(k)===unit)?unit:null;
-      overhead=false;topBtn.setAttribute('aria-pressed','false');topBtn.textContent='Pohled shora';
-      host.dataset.openFloor=String(n);labels.hidden=true;tools.hidden=false;
+      overhead=true;topBtn.setAttribute('aria-pressed','true');topBtn.textContent='Prostorový pohled';
+      host.dataset.openFloor=String(n);labels.hidden=true;tools.hidden=true;
       labelNodes.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===n-1)));
-      caption.textContent=n+'. NP / prostorový řez';
+      caption.textContent=n+'. NP';
       byFloor[n].forEach(k=>asset('cut-'+k));fillUnits();
       animateTo('open');
     }
@@ -279,9 +314,9 @@ window.NS3Model = (() => {
         switches.append(b);
       }
     }
-    function selectUnit(id){if(level!==2)return;if(id&&!['2.1','2.2'].includes(id))return;apartment=id||null;fillUnits();if(motion?.kind!=='open')animateTo('unit');}
+    function selectUnit(id){if(level!==2)return;if(id&&!['2.1','2.2'].includes(id))return;apartment=id||null;if(cutLevel===level)visibleApartment=apartment;fillUnits();if(motion?.kind!=='open')animateTo('unit');}
     function reset(){
-      level=0;apartment=null;overhead=false;tools.hidden=true;labels.hidden=false;
+      level=0;apartment=null;overhead=false;tools.hidden=true;labels.hidden=true;
       host.removeAttribute('data-open-floor');caption.textContent='Pohled z ulice';labelNodes.forEach(b=>b.setAttribute('aria-pressed','false'));
       // Keep the previous cut attached until the return move starts reversing.
       animateTo('close');
@@ -315,7 +350,7 @@ window.NS3Model = (() => {
       if(!level){const f=hit.slice().reverse().find(f=>inside(pt,f.poly));if(f)activate(f.floor);}
       else if(level===2){const u=unitHit.slice().reverse().find(v=>inside(pt,v.poly));if(u){selectUnit(u.id);onApartment?.(u.id);}}
     });
-    reduced.addEventListener('change',()=>{if(reduced.matches&&motion){motion=null;cutLevel=level;delete host.dataset.phase;canvas.style.opacity='1';Object.assign(state,targetCamera());host.dataset.pose=level?'plan':'house';paintSoon();}});
+    reduced.addEventListener('change',()=>{quiet=reduced.matches;syncMotionControl();});
     host.dataset.pose='house';
     sizing();
     return {select:changeLevel,selectUnit,reset,get current(){return level||null;}};

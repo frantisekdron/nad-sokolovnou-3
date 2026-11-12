@@ -35,10 +35,11 @@ if(el('.plan-console')) {
     el('.model-plan').setAttribute('aria-label','Zvětšit '+img.alt.toLowerCase());
     el('[data-house-metrics]').textContent=u.layout+' · '+u.area+' m² · '+u.price;
   }
-  function reveal(value) {
+  function depart(value) {
     level=Number(value);
     board.dataset.selected=String(level);
-    el('.model-overview').hidden=true; el('.model-result').hidden=false;
+    board.dataset.travel='opening';
+    el('.model-overview').hidden=true; el('.model-result').hidden=true;
     el('.fold-house').hidden=false;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.house)===level)));
     el('[data-house-label]').textContent=level+'. nadzemní podlaží';
@@ -50,14 +51,20 @@ if(el('.plan-console')) {
     });
     selectApartment(floorUnits[level][0]);
   }
-  const model=window.NS3Model.mount(drawing,reveal,selectApartment);
-  function chooseFloor(n){ model.select(n); reveal(n); }
+  function arrive(n){
+    board.dataset.travel=n?'arrived':'home';
+    el('.model-result').hidden=!n;
+    el('.model-overview').hidden=!!n;
+    el('[data-arrival]').textContent=n?'Otevřeno '+n+'. nadzemní podlaží.':'Celý dům.';
+  }
+  const model=window.NS3Model.mount(drawing,depart,selectApartment,arrive);
+  function chooseFloor(n){ model.select(n); depart(n); }
   all('[data-house]').forEach(b=>b.addEventListener('click',()=>chooseFloor(Number(b.dataset.house))));
   el('[data-house-first]').addEventListener('click',()=>{chooseFloor(1);el('[data-house="1"]').focus({preventScroll:true});});
   unitChoices.addEventListener('click',event=>{const b=event.target.closest('[data-house-unit]');if(b){selectApartment(b.dataset.houseUnit);model.selectUnit(b.dataset.houseUnit);}});
   all('[data-house], [data-house-first]').forEach(b=>b.disabled=false);
   el('.fold-house').addEventListener('click',()=>{
-    model.reset();board.removeAttribute('data-selected');el('.model-overview').hidden=false;el('.model-result').hidden=true;
+    model.reset();board.dataset.travel='returning';board.removeAttribute('data-selected');el('.model-overview').hidden=true;el('.model-result').hidden=true;
     all('[data-house]').forEach(b=>b.setAttribute('aria-pressed','false'));el('[data-house="'+level+'"]').focus({preventScroll:true});
     el('.fold-house').hidden=true;level=0;
   });
@@ -72,15 +79,17 @@ if(el('.plan-console')) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let wanted = !reduced.matches && !navigator.connection?.saveData;
   let visible = false;
+  function loadFilm() {
+    if(film.getAttribute('src'))return;
+    const format=matchMedia('(max-width:700px)').matches?'mobil':'siroky';
+    film.src='assets/atelier/pruceli-'+format+'.mp4';
+  }
   function syncFilm() {
     if (!wanted || !visible || document.hidden) {
       film.pause();
       return;
     }
-    if (!film.getAttribute('src')) {
-      const format = matchMedia('(max-width:700px)').matches ? 'mobil' : 'siroky';
-      film.src = 'assets/atelier/podoli-' + format + '.mp4';
-    }
+    loadFilm();
     film.play().catch(() => {});
   }
   function updateControl() {
@@ -90,11 +99,33 @@ if(el('.plan-console')) {
     toggle.setAttribute('aria-label', label);
     el('[data-film-label]').textContent = label;
   }
+  const chapters=all('[data-film-chapter]');
+  const chapterBar=el('.film-chapters');
+  let pendingSeek=null;
+  function seek(){
+    if(pendingSeek===null || film.readyState<1)return;
+    film.currentTime=pendingSeek;pendingSeek=null;
+  }
+  function markChapter(){
+    const time=film.currentTime;
+    const chapter=time<3.9 || time>=11.4?0:time<7.7?1:2;
+    chapters.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===chapter)));
+  }
+  chapterBar.hidden=false;
+  chapters.forEach(b=>b.addEventListener('click',()=>{
+    pendingSeek=Number(b.dataset.filmChapter);loadFilm();
+    if(!film.readyState)film.load();
+    seek();
+    if(wanted)syncFilm();
+  }));
+  film.addEventListener('loadedmetadata',seek);
+  film.addEventListener('seeked',()=>{film.classList.add('has-frame');markChapter();});
+  film.addEventListener('timeupdate',markChapter);
   toggle.hidden = false;
   toggle.addEventListener('click', () => { wanted = film.paused; syncFilm(); });
   film.addEventListener('playing', () => {film.classList.add('has-frame'); updateControl();});
   film.addEventListener('pause', updateControl);
-  film.addEventListener('error', () => {film.classList.remove('has-frame'); toggle.hidden=true;});
+  film.addEventListener('error', () => {film.classList.remove('has-frame'); toggle.hidden=true;chapterBar.hidden=true;});
   reduced.addEventListener('change', () => {wanted=!reduced.matches && !navigator.connection?.saveData; syncFilm();});
   document.addEventListener('visibilitychange', syncFilm);
   new IntersectionObserver(([entry]) => {visible=entry.isIntersecting; syncFilm();}).observe(film);

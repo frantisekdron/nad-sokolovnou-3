@@ -1,0 +1,109 @@
+.design-b{--ink:#30252b;--plum:#271e26;--paper:#f5eee3;--metal:#c9aa80;--ochre:#735337;--gutter:clamp(20px,6vw,114px);--fine:#cabca9;--curve:cubic-bezier(.19,.76,.19,1)}
+.design-b .atelier-head{position:absolute;inset:0 0 auto;height:76px;background:transparent;border:0;color:#fff6e7}
+.design-b .atelier-head:after{content:"";position:absolute;left:var(--gutter);right:var(--gutter);bottom:0;height:1px;background:#d9c29d55;pointer-events:none}
+.project-logo img{width:clamp(160px,16vw,220px);filter:brightness(0) invert(1);opacity:.96}
+.atelier-head .mainnav{gap:clamp(18px,3vw,60px)}.atelier-head .mainnav a{position:relative;text-decoration:none}.atelier-head .mainnav a:after,.b-text-link:after{content:"";position:absolute;bottom:-4px;left:0;right:0;height:1px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .35s var(--curve)}
+.atelier-head .mainnav a:hover:after,.atelier-head .mainnav a:focus-visible:after,.b-text-link:hover:after{transform:scaleX(1)}
+.design-b .atelier-head .contactnav{border:1px solid #d5c5af99;border-radius:40px;background:transparent;color:#fff6e7;font-size:11px;padding:11px 17px}
+.design-b .film-cover{height:min(95svh,980px);min-height:625px;align-items:center;background:radial-gradient(ellipse at 12% 60%,#443038 0,#30222b 38%,#241c24 74%);overflow:hidden}
+.design-b .film-cover:after{background:linear-gradient(90deg,#281e26bb 3%,transparent 61%);z-index:0}
+.film-cover:before{content:"";position:absolute;inset:17% 40% -35% -12%;background:url("assets/atelier/linie-pudorysu.svg") center/contain no-repeat;opacity:.12;filter:brightness(2.9);transform:rotate(-12deg);pointer-events:none}
+.gate-scene{position:absolute;z-index:0;inset:13% var(--gutter) -4% 36%;isolation:isolate}
+.gate-aperture,.gate-rim,.gate-rim:after{position:absolute;inset:0;border-radius:50% 50% 0 0 / 39% 39% 0 0}
+.gate-aperture{overflow:hidden;background:#786151}
+.gate-rim{transform:translate(-11px,-9px);border:1px solid #c6a978a8}
+.gate-rim:after{content:"";inset:-9px -12px 0 -12px;border:1px solid #c6a9783d}
+.design-b .film-cover .gate-aperture picture,.design-b .film-cover .gate-aperture picture img,.design-b .film-cover .gate-aperture video{z-index:0;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.gate-aperture:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#2c19294f,transparent 52%),linear-gradient(0deg,#25192365,transparent 32%);pointer-events:none}
+.film-ink{position:relative;z-index:1;align-self:flex-end;padding:0 0 clamp(60px,11vh,145px) var(--gutter)}
+.film-ink .b-eyebrow{font-size:10px;letter-spacing:.26em;color:#f0d1aa;gap:14px}
+.design-b .film-ink h1{margin:28px 0 26px;font:500 clamp(66px,8.1vw,150px)/.99 var(--sans);letter-spacing:-.088em;color:#fff4e5;text-shadow:0 2px 24px #1b101c52}
+.title-line{display:block;overflow:hidden;padding:1px .12em .09em 0;margin:-.02em -.12em -.09em 0}.title-line>span{display:block}
+.title-line:first-child{font:italic 400 1.06em/.95 var(--serif);letter-spacing:-.05em}
+.title-line sup{display:inline-flex;vertical-align:top;align-items:center;justify-content:center;border:1px solid #e8d3adbb;border-radius:50%;margin:.25em 0 0 .07em;width:1.45em;height:1.45em;font:400 .34em/1 var(--serif);letter-spacing:0;color:#f2ddba}
+.design-b .film-link{border:0;gap:14px;font-size:13px}.film-link i{height:42px;width:42px;display:grid;place-items:center;border:1px solid #d7c3a0;border-radius:50%;transition:background .3s}.film-link:hover i{background:#665041}
+.design-b .film-toggle{bottom:34px;background:#241c24dc}.b-text-link{position:relative}
+.design-b .b-pad h2,.design-b .house-section h2{font:500 clamp(51px,5.2vw,90px)/1.02 var(--sans);letter-spacing:-.082em}
+.design-b .b-pad h2 em,.design-b .house-section h2 em{font:italic 400 1.12em/.92 var(--serif);letter-spacing:-.05em}
+.b-eyebrow,.design-b .house-section>.kicker{font:600 10px/1.5 var(--sans);letter-spacing:.22em}
+.b-heading{grid-template-columns:1.22fr .78fr;gap:0 12%;padding-bottom:clamp(34px,4vw,70px)}.b-heading .b-eyebrow,.b-gallery-head .b-eyebrow,.penthouse-story .b-eyebrow{display:flex;gap:12px;align-items:center}.b-heading .b-eyebrow:before,.b-gallery-head .b-eyebrow:before,.penthouse-story .b-eyebrow:before{content:"";width:28px;height:1px;background:currentColor}
+.residence-section{background:#f5eadd}.residence-pair{align-items:start;gap:clamp(15px,3.5vw,70px)}.residence-pair figure{margin:0;min-width:0}
+.study-glass{position:relative;overflow:hidden}.design-b .study-glass .imgbtn,.design-b .residence-room .imgbtn{aspect-ratio:1.4}
+.ink-study{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;clip-path:inset(0 calc(100% - var(--drawing,48%)) 0 0);pointer-events:none}
+.study-rule{position:absolute;top:0;bottom:0;left:var(--drawing,48%);width:1px;background:#f7e8d2;box-shadow:1px 0 #39302a77;pointer-events:none}
+.facade-study figcaption,.residence-room figcaption{border-bottom:1px solid var(--fine);display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;font:500 12px/1.4 var(--sans);min-height:42px}
+.facade-study figcaption span{color:#886f56}.facade-study input{accent-color:#745444;width:clamp(64px,12vw,170px);height:18px;cursor:ew-resize}
+.design-b .house-section{background:#e9e1d3;position:relative}.house-section .house-intro{margin-bottom:22px;max-width:45ch}.house-section .model-sheet{display:block;margin:25px 0 0;background:#f6f0e6;border:1px solid #b3a48e}
+.model-drawing{display:block;border:0}.drawing-head{align-items:center;background:#f4ecde;color:#3a302a;padding:11px 20px}.motion-setting{display:flex;align-items:center;gap:8px;cursor:pointer;font:500 11px var(--sans);letter-spacing:0}.motion-setting input{accent-color:#6d4c3b}
+.model-canvas{position:relative;background:#e9dfcd;display:block;min-height:0}.design-b .ns-studio{height:clamp(390px,58svh,660px);background:radial-gradient(ellipse at 48% 31%,#fbf5e8,#e7ddcb 78%,#d2c6b1);transition:none}
+.ns-studio:before{background-image:linear-gradient(#6b503009 1px,transparent 1px),linear-gradient(90deg,#6b503009 1px,transparent 1px);background-size:34px 34px}
+.ns-floor-labels button,.ns-cut-tools button{min-height:29px;background:#fff9ed;border:1px solid #93826a;border-radius:20px;padding-inline:10px}
+.ns-view-name{color:#5b4d40;top:17px;left:17px}.ns-cut-tools{bottom:14px;left:16px;right:16px}.ns-cut-tools button{min-height:32px}
+.model-actions{min-height:58px;align-items:center;background:#efe5d5}.floor-strip{gap:6px}.floor-strip button,.floor-apartments button,.fold-house{border-radius:25px;padding:9px 16px}
+.model-plans{display:block;padding:0;background:#faf4e8}.model-overview,.model-result{padding:22px clamp(18px,3vw,48px);border-top:1px solid #b6a790}
+.model-overview{display:flex;gap:18px;align-items:center;justify-content:space-between}.model-overview .model-cover-photo,.model-overview .drawing-label{display:none}.model-overview h3 br{display:none}.model-overview p{margin:0;max-width:40ch}.design-b .model-overview h3{font:400 29px/1.08 var(--serif);letter-spacing:-.035em;max-width:8em;margin:0}
+.model-result{display:grid;grid-template-columns:minmax(175px,1fr) minmax(145px,.7fr) minmax(155px,.8fr);grid-template-rows:auto auto auto;gap:7px 24px;align-items:center}
+.model-result .drawing-label,.model-result h3,.model-result .floor-apartments{grid-column:1}.model-result h3{margin:0}.model-plan{grid-column:2;grid-row:1/4;margin:0;height:110px}
+.model-result [data-house-metrics]{grid-column:3;grid-row:1;margin:0}.model-result [data-floor-detail]{grid-column:3;grid-row:2;justify-self:start}.model-result .unit-photo-link{grid-column:3;grid-row:3;justify-self:start;margin:0}
+.travel-line{position:absolute;inset:auto 0 0;height:3px;overflow:hidden;pointer-events:none}.travel-line i{display:block;height:100%;background:#8c673e;width:100%;transform:scaleX(0);transform-origin:left}
+.model-sheet:has(.ns-studio[data-pose=moving]) .travel-line i{animation:travel 3.55s var(--curve) both}
+.model-sheet[data-travel=arrived] .model-result{animation:details-enter .48s var(--curve) both}
+.sr-arrival{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.penthouse{position:relative;isolation:isolate;background:#30212b;color:#faebd9}.penthouse:before{content:"";position:absolute;inset:0;z-index:-1;background:url("assets/atelier/linie-pudorysu.svg") 82% 18%/auto 125% no-repeat;opacity:.12;filter:brightness(2.3)}
+.penthouse-story{grid-template-columns:1.15fr .85fr}.penthouse-pair{gap:clamp(12px,2.5vw,44px)}.design-b .penthouse-pair .imgbtn{aspect-ratio:1.58}
+.b-gallery{background:#f8f0e4}.b-gallery-head{gap:12px 10%}
+.folio-stage{display:grid;grid-template-columns:1fr 1fr;gap:20px}.folio-stage figure{margin:0}.folio-frame figcaption{display:flex;align-items:baseline;gap:14px;font:400 22px var(--serif);color:#f4e7d4}.folio-frame figcaption small{font:500 10px/1.4 var(--mono);letter-spacing:.08em}
+.folio-index,.folio-arrows{display:none}.folio.interactive{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(205px,.83fr);gap:clamp(20px,5vw,80px);align-items:center}
+.interactive .folio-stage{display:grid;grid-template:1fr/1fr;isolation:isolate;overflow:hidden;gap:0;background:#332832;touch-action:pan-y}.interactive .folio-frame{grid-area:1/1;position:relative;overflow:hidden}.interactive .folio-frame.current{z-index:1}
+.design-b .folio .imgbtn{aspect-ratio:1.55}.folio-frame figcaption{padding:14px 18px;min-height:50px;background:#332832}.folio-frame .image-caption{display:none}
+.interactive .folio-index{display:grid}.folio-index button{position:relative;padding:14px 4px;width:100%;display:flex;align-items:center;gap:16px;text-align:left;border-top:1px solid #bba997;color:#69594f;font:500 14px/1.4 var(--sans)}
+.folio-index button span{font:500 10px var(--mono);color:#75583f}.folio-index button:last-child{border-bottom:1px solid #bba997}.folio-index button[aria-pressed=true]{color:#2e2228;font-weight:700}
+.folio-index button:after{content:"";height:2px;position:absolute;inset:auto 0 -1px;background:#865f3d;transform:scaleX(0);transform-origin:left;transition:transform .45s var(--curve)}.folio-index button[aria-pressed=true]:after{transform:scaleX(1)}
+.interactive .folio-arrows{display:flex;align-items:center;justify-content:space-between;gap:17px;margin-top:22px}.folio-arrows button{width:44px;height:44px;display:grid;place-items:center;border:1px solid #917b64;border-radius:50%}.folio-arrows button:hover{background:#e5d4bf}.folio-arrows output{font:11px var(--mono);color:#594638}
+.riverside{background:#e9e7db}.river-hero{position:relative;overflow:hidden}.design-b .river-hero .imgbtn{aspect-ratio:2.35}
+.project-contact{background:#251c25}.project-contact.blueprint:before{background-position:63% 40%;opacity:.2}.project-contact address{border-left:1px solid #b8a18370;padding-left:clamp(20px,4vw,74px)}
+@keyframes first-type{from{transform:translateY(116%) rotate(2deg)}to{transform:none}}
+@keyframes aperture{from{transform:translateY(14%) scale(.9);opacity:.45}to{transform:none;opacity:1}}
+@keyframes shutter{from{transform:scaleY(1)}to{transform:scaleY(0)}}
+@keyframes details-enter{from{opacity:.2;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes travel{to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:no-preference){
+ .gate-scene{animation:aperture 1.15s var(--curve) both}.gate-shutter{position:absolute;z-index:2;inset:0;background:linear-gradient(#402d37,#2a1e28);transform-origin:top;animation:shutter 1s .06s var(--curve) both}
+ .title-line>span{animation:first-type 1.05s .1s var(--curve) both}.title-line:nth-child(2)>span{animation-delay:.26s}.film-link,.film-ink .b-eyebrow{animation:details-enter .85s .32s both}
+ @supports ((animation-timeline:view()) and (animation-range:entry)){
+  .river-hero img{animation:river-drift linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+  @keyframes river-drift{from{transform:scale(1.12) translateY(-2.5%)}to{transform:scale(1.12) translateY(2.5%)}}
+ }
+}
+@media(max-width:760px){
+ .design-b .atelier-head{height:62px}.atelier-head .mainnav.open{background:#30232c}
+ .design-b .film-cover{min-height:540px;height:88svh}.gate-scene{inset:16% 5% 0 22%}.film-ink{padding-bottom:70px}.design-b .film-ink h1{font-size:clamp(69px,11.8vw,105px)}
+ .b-heading,.penthouse-story{grid-template-columns:1fr}.residence-pair{gap:18px}.b-gallery-head{gap:12px}.design-b .b-pad h2,.design-b .house-section h2{font-size:clamp(43px,7.8vw,64px)}
+ .folio.interactive{grid-template-columns:1fr;gap:16px}.interactive .folio-side{display:grid}.interactive .folio-index{grid-template-columns:repeat(3,1fr);gap:0 12px}.folio-index button{font-size:12px;padding:10px 0;gap:6px}.interactive .folio-arrows{margin:12px 0 0}
+ .model-overview{flex-wrap:wrap}.model-result{grid-template-columns:1fr 1fr;gap:9px 15px}.model-result [data-house-metrics],.model-result [data-floor-detail],.model-result .unit-photo-link{grid-column:1/-1;grid-row:auto}
+ .project-contact address{padding:20px 0 0;border:0;border-top:1px solid #a991735e}.model-actions{min-height:54px}.design-b .ns-studio{height:clamp(330px,62svh,500px)}
+}
+@media(max-width:550px){
+ .design-b .atelier-head .contactnav{padding:8px 10px;font-size:9px}.design-b .film-cover{min-height:530px;height:min(91svh,790px)}
+ .gate-scene{inset:16% 7% 8% 18%}.gate-aperture,.gate-rim,.gate-rim:after{border-radius:50% 50% 0 0 / 25% 25% 0 0}
+ .film-ink{padding:0 var(--gutter) 70px;width:100%}.design-b .film-ink h1{font-size:clamp(48px,12.4vw,72px);letter-spacing:-.075em;margin:20px 0 15px}.design-b .film-cover:after{background:linear-gradient(0deg,#251c25df 7%,#261b244d 46%,transparent 73%)}
+ .design-b .film-link i{height:33px;width:33px}.design-b .film-toggle{bottom:15px;right:7%;min-height:34px}.gate-rim{transform:translate(-6px,-5px)}.gate-rim:after{inset:-6px -7px 0 -7px}
+ .residence-pair{grid-template-columns:1fr}.design-b .study-glass .imgbtn,.design-b .residence-room .imgbtn{aspect-ratio:1.5}.residence-room figcaption{padding-top:6px}
+ .b-heading{padding-bottom:23px}.design-b .penthouse-pair .imgbtn{aspect-ratio:.9}.study-glass .zoombadge{z-index:2}.design-b .ns-studio{height:clamp(312px,88vw,400px)}
+ .floor-strip button,.fold-house{padding:8px 9px}.drawing-head{padding:10px}.model-overview{gap:8px}.model-overview p{display:none}.model-overview h3{flex:1}
+ .folio-frame figcaption{font-size:18px;min-height:40px;padding:9px 10px}.folio-index button{min-height:42px;font-size:11px}.design-b .river-hero .imgbtn{aspect-ratio:1.45}
+}
+@media(prefers-reduced-motion:reduce){.model-sheet[data-travel=arrived] .model-result{animation:none}.film-cover *,.folio-index button:after{animation:none;transition:none}.travel-line{display:none}}
+.model-sheet:has(.ns-studio[data-pose=moving]) .travel-line i{animation:none;transform:scaleX(var(--journey,0))}
+.project-contact{overflow:hidden}.project-contact.blueprint:before{display:none}
+.project-contact .contact-trace{position:absolute;z-index:-1;left:31%;top:-20%;width:52%;height:145%;pointer-events:none;transform:rotate(-10deg);opacity:.27}
+.contact-trace path{stroke:#d6b994;stroke-width:2;stroke-dasharray:1}
+.design-b .film-ink h1 .title-line,.design-b .film-ink h1 .title-line>span{font-size:inherit;color:inherit;letter-spacing:inherit}
+.design-b .film-ink h1 .title-line:first-child{font-size:.98em;letter-spacing:-.045em}
+.design-b .film-ink h1 .title-line:nth-child(2){letter-spacing:-.065em}
+.film-chapters{position:absolute;z-index:2;left:var(--gutter);bottom:29px;display:flex;gap:20px}
+.film-chapters button{position:relative;min-height:36px;padding:5px 2px;color:#eee1cf;font:500 10px/1.3 var(--sans);text-transform:uppercase;letter-spacing:.13em}
+.film-chapters button:after{content:"";position:absolute;bottom:5px;left:0;right:0;height:1px;background:#e3be90;transform:scaleX(0);transform-origin:left;transition:transform .35s}
+.film-chapters button[aria-pressed=true]:after,.film-chapters button:hover:after{transform:scaleX(1)}
+@media(max-height:720px) and (min-width:761px){.film-ink{padding-bottom:76px}}
+@media(max-width:760px){.film-chapters{bottom:17px;gap:12px}.film-chapters button{font-size:9px}.design-b .film-toggle{bottom:18px}}
