@@ -119,3 +119,85 @@
   },{threshold:.15});
   observer.observe(el('#kontakt'));
 }
+
+{
+  const cinema=el('#project-cinema'),movie=cinema.querySelector('video');
+  const ambient=el('[data-film]');let resume=false,timestamp=null;
+  function seekFilm(){if(timestamp!==null && movie.readyState>=1){movie.currentTime=timestamp;timestamp=null;}}
+  el('[data-cinema-open]').addEventListener('click',()=>{
+    resume=!ambient.paused;ambient.pause();cinema.showModal();
+    document.body.classList.add('cinema-open');
+    if(!movie.getAttribute('src'))movie.src='assets/atelier/film-rezidence.mp4';
+    if(movie.ended)movie.currentTime=0;
+    movie.play().catch(()=>{});
+    el('[data-cinema-close]').focus({preventScroll:true});
+  });
+  movie.addEventListener('loadedmetadata',seekFilm);
+  all('[data-film-jump]').forEach(b=>b.addEventListener('click',()=>{timestamp=Number(b.dataset.filmJump);seekFilm();movie.play().catch(()=>{});}));
+  movie.addEventListener('timeupdate',()=>{const t=movie.currentTime;all('[data-film-jump]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.filmJump)===(t>=32.4?0:t>=25?25:t>=16?16:0))));});
+  function closeCinema(){movie.pause();cinema.close();}
+  cinema.addEventListener('cancel',()=>movie.pause());
+  el('[data-cinema-close]').addEventListener('click',closeCinema);
+  cinema.addEventListener('click',e=>{if(e.target===cinema){const r=cinema.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeCinema();}});
+  cinema.addEventListener('close',()=>{movie.pause();document.body.classList.remove('cinema-open');if(resume&&!document.hidden)ambient.play().catch(()=>{});});
+}
+
+{
+  const calm=matchMedia('(prefers-reduced-motion: reduce)');
+  // Both exhibitions keep their complete views readable without JavaScript.
+  function exhibit(container,buttonSelector,viewSelector,buttonKey,viewKey){
+    const root=el(container),buttons=Array.from(root.querySelectorAll(buttonSelector)),views=Array.from(root.querySelectorAll(viewSelector));
+    let active=0,animation;
+    function choose(n,initial=false){
+      if(!initial&&n===active)return;active=n;animation?.cancel();
+      let view;
+      for(const item of views){item.hidden=Number(item.dataset[viewKey])!==n;if(!item.hidden)view=item;}
+      for(const button of buttons)button.setAttribute('aria-pressed',String(Number(button.dataset[buttonKey])===n));
+      if(!initial && !calm.matches && view.animate){
+        animation=view.animate([{clipPath:'inset(3% 0 5% 0)',opacity:.45,transform:'translateY(9px)'},{clipPath:'inset(0)',opacity:1,transform:'none'}],{duration:520,easing:'cubic-bezier(.16,.68,.2,1)'});
+      }
+    }
+    buttons.forEach(b=>b.addEventListener('click',()=>choose(Number(b.dataset[buttonKey]))));
+    root.addEventListener('keydown',e=>{
+      if(!buttons.includes(e.target)||!['ArrowLeft','ArrowRight'].includes(e.key))return;
+      e.preventDefault();const n=(active+(e.key==='ArrowLeft'?-1:1)+views.length)%views.length;
+      choose(n);buttons.find(b=>Number(b.dataset[buttonKey])===n&&b.parentElement===e.target.parentElement)?.focus();
+    });
+    root.classList.add('ready');choose(0,true);
+  }
+  exhibit('.room-spread','[data-room-choice]','[data-room-shot]','roomChoice','roomShot');
+  exhibit('.paper-atlas','[data-near]','[data-near-view]','near','nearView');
+}
+
+{
+  const study=el('.facade-study'),frame=study.querySelector('.study-glass'),lens=el('.masonry-lens');
+  const toggle=el('[data-study-lens]'),hint=el('.lens-instruction'),photo=frame.querySelector('.imgbtn img');
+  let active=false,u=.61,v=.45;
+  function position(){
+    if(!active||!photo.naturalWidth)return;
+    const {width,height}=frame.getBoundingClientRect(),diameter=lens.offsetWidth;
+    if(!width || !diameter)return;
+    const ratio=Math.max(width/photo.naturalWidth,height/photo.naturalHeight);
+    const rw=photo.naturalWidth*ratio,rh=photo.naturalHeight*ratio;
+    const x=Math.max(diameter/2,Math.min(width-diameter/2,u*width)),y=Math.max(diameter/2,Math.min(height-diameter/2,v*height));
+    const zoom=2.45;
+    lens.style.left=x+'px';lens.style.top=y+'px';
+    lens.style.backgroundSize=rw*zoom+'px '+rh*zoom+'px';
+    lens.style.backgroundPosition=(diameter/2-(x+(rw-width)/2)*zoom)+'px '+(diameter/2-(y+(rh-height)/2)*zoom)+'px';
+  }
+  function pointer(e){if(!active)return;const r=frame.getBoundingClientRect();u=(e.clientX-r.left)/r.width;v=(e.clientY-r.top)/r.height;position();}
+  toggle.addEventListener('click',()=>{
+    active=!active;toggle.setAttribute('aria-pressed',String(active));toggle.textContent=active?'Zavřít lupu':'Lupa na fasádu';
+    hint.hidden=lens.hidden=!active;frame.classList.toggle('lens-active',active);
+    if(active){lens.style.backgroundImage='url("assets/fasada-podhled.webp")';position();}
+  });
+  frame.addEventListener('pointerdown',pointer);frame.addEventListener('pointermove',pointer);
+  frame.addEventListener('click',e=>{if(active){e.preventDefault();e.stopPropagation();}},true);
+  study.addEventListener('keydown',e=>{
+    if(!active||e.target.matches('input'))return;
+    if(e.key==='Escape'){toggle.click();toggle.focus();return;}
+    const step={ArrowLeft:[-.08,0],ArrowRight:[.08,0],ArrowUp:[0,-.08],ArrowDown:[0,.08]}[e.key];
+    if(!step)return;e.preventDefault();u=Math.min(1,Math.max(0,u+step[0]));v=Math.min(1,Math.max(0,v+step[1]));position();
+  });
+  new ResizeObserver(position).observe(frame);photo.addEventListener('load',position);
+}

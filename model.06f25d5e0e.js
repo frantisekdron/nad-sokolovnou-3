@@ -15,14 +15,29 @@ window.NS3Model = (() => {
     const host=target.matches('[data-house-model]')?target:target.querySelector('[data-house-model]');
     if(!host)throw new Error('Chybí prostor pro model domu.');
     host.classList.add('ns-studio');
-    host.innerHTML='<canvas aria-label="Trojrozměrný model rezidence s výběrem podlaží"></canvas><div class="ns-floor-labels" role="group" aria-label="Klikněte na patro domu"></div><div class="ns-cut-tools" hidden><div class="ns-unit-switch" role="group" aria-label="Zobrazení dispozic"></div><button class="ns-top" type="button" aria-pressed="false">Pohled shora</button></div><span class="ns-view-name">Pohled z ulice</span>';
-    const canvas=host.querySelector('canvas'), ctx=canvas.getContext('2d');
+    host.innerHTML='<canvas aria-label="Trojrozměrný model rezidence s výběrem podlaží"></canvas><div class="ns-floor-labels" role="group" aria-label="Klikněte na patro domu"></div><div class="ns-cut-tools" hidden><div class="ns-unit-switch" role="group" aria-label="Zobrazení dispozic"></div><button class="ns-top" type="button" aria-pressed="false">Pohled shora</button></div><div class="orbit-controls" role="group" aria-label="Natočení modelu"><button type="button" data-spin="-1" aria-label="Natočit model doleva" title="Natočit doleva">↶</button><button type="button" data-spin="1" aria-label="Natočit model doprava" title="Natočit doprava">↷</button></div><span class="ns-view-name">Pohled z ulice</span>';
+    const canvas=host.querySelector('canvas');canvas.className='model-interaction';
+    const ctx=canvas.getContext('2d');
     const labels=host.querySelector('.ns-floor-labels'), tools=host.querySelector('.ns-cut-tools'), switches=host.querySelector('.ns-unit-switch'), topBtn=host.querySelector('.ns-top');
     const caption=host.querySelector('.ns-view-name'), reduced=matchMedia('(prefers-reduced-motion: reduce)');
     let w=1,h=1,dpr=1, cache={},scheduled=0, level=0, apartment=null, overhead=false, azClosed=-.34, cutLevel=0, hit=[], unitHit=[];
     const state={az:azClosed,tilt:rad(20),ty:7.8,tx:0,tz:0,coverage:.84,spread:0,cut:0};
     let motion=null, hoverFloor=0, visibleApartment=null;
     const travelTrack=target.parentElement;
+    let spatial=null,evening=false,planYaw=-.29;
+    const startScene=new IntersectionObserver(entries=>{
+      if(!entries.some(e=>e.isIntersecting))return;
+      startScene.disconnect();
+      window.NSBuildingScene.mount(host,GEOMETRY,planParts,floorY,paintSoon).then(view=>{
+        spatial=view;paintSoon();
+      }).catch(()=>{host.dataset.renderer='drawing';});
+    },{rootMargin:'450px'});
+    startScene.observe(host);
+    const lightButtons=Array.from(target.closest('.model-sheet').querySelectorAll('[data-model-light]'));
+    lightButtons.forEach(b=>b.addEventListener('click',()=>{
+      evening=b.dataset.modelLight==='evening';host.dataset.light=evening?'evening':'day';
+      lightButtons.forEach(k=>k.setAttribute('aria-pressed',String(k===b)));paintSoon();
+    }));
     const labelNodes=[];
     for(let n=1;n<=5;n++){
       const b=document.createElement('button');b.type='button';b.textContent=n+'. NP';b.dataset.modelFloor=n;b.setAttribute('aria-label',n+'. NP – otevřít podlaží');b.setAttribute('aria-pressed','false');
@@ -60,7 +75,7 @@ window.NS3Model = (() => {
       if(apartment&&level===2)parts=parts.filter(p=>unitId(p.k)===apartment);
       const lo=Math.min(...parts.map(p=>p.left)),hi=Math.max(...parts.map(p=>p.left+p.width));
       const depth=Math.max(...parts.map(p=>p.depth));
-      const tilt=angle(), az=overhead?0:-.29;
+      const tilt=angle(), az=overhead?0:planYaw;
       const footprintW=(hi-lo)*Math.cos(az)+depth*Math.abs(Math.sin(az));
       const footprintH=((hi-lo)*Math.abs(Math.sin(az))+depth*Math.cos(az))*Math.sin(tilt)+1.4*Math.cos(tilt);
       const minDim=Math.min(w,h);
@@ -85,12 +100,12 @@ window.NS3Model = (() => {
     quietControl.addEventListener('change',()=>{quiet=!quietControl.checked;});
     function openingPose(start,dest,n,t,soft){
       const split=ease((t-.035)/.30);
-      const overheadTurn=ease((t-.26)/.43);
-      const unveil=ease((t-.32)/.36);
+      const overheadTurn=ease((t-.28)/.43);
+      const unveil=ease((t-.33)/.36);
       const approach=ease((t-.60)/.40);
       const strength=soft?.43:1;
-      const mid={...closedCamera(),az:azClosed-.23*strength,tilt:rad(24),
-        ty:8.7+(3-n)*1.6*strength,coverage:.67,spread:2.5*strength};
+      const mid={...closedCamera(),az:azClosed-.32*strength,tilt:rad(24),
+        ty:9.1+(3-n)*1.75*strength,tz:.65*strength,coverage:.69,spread:2.95*strength};
       const distant={...dest,coverage:dest.coverage*(soft?.78:.54),tilt:rad(84),az:-.06};
       blend(start,mid,split);
       for(const key of ['az','tilt','ty','tx','tz','coverage']){
@@ -273,6 +288,29 @@ window.NS3Model = (() => {
     function paint() {
       const now=performance.now();updateMotion(now);prepareLens();
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);hit=[];unitHit=[];
+      const accelerated=spatial?.render(state,{w,h,dpr,cutLevel,level,visibleApartment,hoverFloor,light:evening,quiet})||false;
+      host.dataset.renderer=accelerated?'spatial':'drawing';
+      if(accelerated){
+        // Use the same projection as the GPU for mouse, pen and touch picking.
+        if(!level && !motion){
+          hit.push({poly:frontFace(0,floorY(1)).map(proj),floor:1});
+          for(let n=1;n<=4;n++){
+            const y=floorY(n),top=y+floorHeight;
+            hit.push({poly:frontFace(y,top).map(proj),floor:n},
+              {poly:[[halfWidth,top,front],[halfWidth,top,rear],[halfWidth,y,rear],[halfWidth,y,front]].map(proj),floor:n});
+            if(state.az>0)hit.push({poly:[[-halfWidth,top,front],[-halfWidth,top,rear],[-halfWidth,y,rear],[-halfWidth,y,front]].map(proj),floor:n});
+          }
+          const y=floorY(5);
+          hit.push({poly:[[-halfWidth,y,front],[halfWidth,y,front],[halfWidth,y+2.47,-.86],[-halfWidth,y+2.47,-.86]].map(proj),floor:5},
+            {poly:plane(-halfWidth,halfWidth,rear,-.86,y+2.47).map(proj),floor:5});
+        }
+        if(cutLevel===2 && state.cut>.8){
+          for(const p of planParts(2)){
+            const id=unitId(p.k);if(visibleApartment&&visibleApartment!==id)continue;
+            unitHit.push({poly:plane(p.left,p.left+p.width,front-p.depth,front,floorY(2)).map(proj),id});
+          }
+        }
+      }else{
       const shadowX=w*.48,shadowY=h*.83;
       ctx.save();ctx.translate(shadowX,shadowY);ctx.scale(w*.34,h*.06);const shadow=ctx.createRadialGradient(0,0,.02,0,0,1);
       shadow.addColorStop(0,'rgba(75,62,38,'+(.27*(1-state.cut))+')');shadow.addColorStop(1,'rgba(75,62,38,0)');ctx.fillStyle=shadow;ctx.fillRect(-1,-1,2,2);ctx.restore();
@@ -281,6 +319,7 @@ window.NS3Model = (() => {
       for(let n=1;n<=5;n++){
         if(n===cutLevel)cutaway();
         if(houseAlpha>.008)floorGroup(n,n===cutLevel?houseAlpha*houseAlpha:houseAlpha);
+      }
       }
       if(!level && !motion && state.cut<.18){
         let last=h*.09-25;
@@ -322,6 +361,16 @@ window.NS3Model = (() => {
       animateTo('close');
     }
     topBtn.addEventListener('click',()=>{overhead=!overhead;topBtn.setAttribute('aria-pressed',String(overhead));topBtn.textContent=overhead?'Prostorový pohled':'Pohled shora';caption.textContent=level+'. NP / '+(overhead?'pohled shora':'prostorový řez');if(motion?.kind!=='open')animateTo('unit');});
+    function houseAngle(value){return Math.max(-.95,Math.min(host.dataset.renderer==='spatial'?.65:-.04,value));}
+    host.querySelectorAll('[data-spin]').forEach(button=>button.addEventListener('click',()=>{
+      if(motion && motion.kind!=='orbit')return;
+      const increment=Number(button.dataset.spin)*.24;
+      if(level){
+        overhead=false;planYaw=Math.min(.9,Math.max(-1.05,planYaw+increment));
+        topBtn.setAttribute('aria-pressed','false');topBtn.textContent='Pohled shora';caption.textContent=level+'. NP / prostorový řez';
+      }else azClosed=houseAngle(azClosed+increment);
+      animateTo('orbit');
+    }));
     function inside(p,poly){
       let yes=false;
       for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if(((a[1]>p[1])!==(b[1]>p[1]))&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0]))yes=!yes;}
@@ -341,8 +390,12 @@ window.NS3Model = (() => {
       const box=canvas.getBoundingClientRect(),point=[e.clientX-box.left,e.clientY-box.top];
       highlight(hit.slice().reverse().find(f=>inside(point,f.poly))?.floor||0);
     });
-    canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY,azClosed];});
-    canvas.addEventListener('pointermove',e=>{if(down&&!level&&!motion && Math.abs(e.clientX-down[0])>5){azClosed=Math.min(-.08,Math.max(-.68,down[2]+(e.clientX-down[0])*.003));state.az=azClosed;paintSoon();}});
+    canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY,level?planYaw:azClosed];});
+    canvas.addEventListener('pointermove',e=>{if(!down||motion||Math.abs(e.clientX-down[0])<5)return;
+      const angle=down[2]+(e.clientX-down[0])*.005;
+      if(!level){azClosed=houseAngle(angle);state.az=azClosed;}
+      else if(!overhead){planYaw=Math.min(.90,Math.max(-1.05,angle));Object.assign(state,targetCamera());}
+      paintSoon();});
     canvas.addEventListener('pointercancel',()=>{down=null;});
     canvas.addEventListener('pointerup',e=>{
       const last=down;down=null;if(!last||Math.hypot(e.clientX-last[0],e.clientY-last[1])>7)return;

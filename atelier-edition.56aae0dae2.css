@@ -107,3 +107,114 @@
 .film-chapters button[aria-pressed=true]:after,.film-chapters button:hover:after{transform:scaleX(1)}
 @media(max-height:720px) and (min-width:761px){.film-ink{padding-bottom:76px}}
 @media(max-width:760px){.film-chapters{bottom:17px;gap:12px}.film-chapters button{font-size:9px}.design-b .film-toggle{bottom:18px}}
+
+.ns-studio canvas.spatial-canvas{position:absolute;inset:0;z-index:0;pointer-events:none;width:100%;height:100%}
+.ns-studio canvas.model-interaction{position:relative;z-index:1;background:none}
+.ns-floor-labels,.ns-cut-tools,.ns-view-name{z-index:2}
+.model-light{display:flex;gap:3px;align-items:center;border:1px solid #aa9680;border-radius:25px;padding:2px}
+.model-light button{border-radius:20px;padding:6px 12px;color:#574638;font:500 11px/1.4 var(--sans)}
+.model-light [aria-pressed=true]{background:#493a35;color:#fff8ed}
+.design-b .ns-studio[data-light=evening]{background:radial-gradient(ellipse at 45% 45%,#eee1cc 5%,#d8c6ad 65%,#bdab9c)}
+.ns-studio[data-light=evening][data-renderer=drawing] .model-interaction{filter:sepia(.28) saturate(1.16)}
+@media(max-width:550px){.drawing-head{gap:5px;flex-wrap:wrap}.model-light button{padding:4px 7px;font-size:10px}.drawing-head .model-address{font-size:9px;letter-spacing:0}.motion-setting{font-size:10px}}
+
+/* The project frontispiece pairs warm drawing paper with a recessed film frame. */
+.design-b .atelier-head{height:74px;background:#f4ecde;color:#302b27;border-bottom:1px solid #bcac94}
+.design-b .atelier-head:after{display:none}.atelier-head .project-logo img{filter:none;opacity:1}
+.design-b .atelier-head .contactnav{color:#3b3029;border-color:#9f8c73}
+.design-b .film-cover{min-height:615px;height:min(93svh,920px);background:linear-gradient(105deg,#f9f3e9,#efe3d1 46%,#dbc9ad);color:#322b25}
+.design-b .film-cover:after{display:none}.film-cover:before{inset:28% 48% -48% -17%;filter:none;opacity:.12;transform:rotate(-14deg)}
+.gate-scene{inset:calc(74px + 3.5%) 3.5% 5% 45%;border-radius:48% 48% 1px 1px / 31% 31% 0 0}
+.gate-aperture,.gate-rim,.gate-rim:after{border-radius:inherit}
+.gate-aperture{box-shadow:0 14px 27px -18px #3f3027a1}
+.gate-rim{border:1px solid #856b4a;transform:translate(-8px,-7px)}.gate-rim:after{inset:-6px -7px 0 -7px;border-color:#ad917166}
+.gate-aperture:after{background:linear-gradient(0deg,#231b2370,transparent 26%)}
+.film-ink{align-self:center;padding:76px 0 10px var(--gutter);width:47%}.film-ink .b-eyebrow{color:#6c4d37}.film-ink .b-eyebrow i{background:#9d7855}
+.design-b .film-ink h1{color:#302724;text-shadow:none;font-size:clamp(62px,6.9vw,131px);line-height:.94;margin:27px 0 17px}
+.design-b .film-ink h1 .title-line:first-child{color:#896143;font-size:.98em}.title-line sup{color:#845b38;border-color:#947753}
+.cover-address{font:400 clamp(14px,1.17vw,18px)/1.55 var(--sans);margin:21px 0 15px;color:#504337}
+.cover-invitations{display:flex;align-items:center;gap:clamp(11px,1.6vw,30px);flex-wrap:wrap}
+.design-b .film-link{color:#fff5e5;background:#42352e;border-radius:30px;padding:7px 17px 7px 8px;gap:8px;font-size:12px}
+.design-b .film-link i{width:30px;height:30px;border-color:#a38a70}.film-link:hover{background:#594336}
+.cinema-invite{display:inline-flex;gap:9px;align-items:center;padding:7px 0;color:#44342a;text-align:left;font:600 12px/1.4 var(--sans)}
+.cinema-invite .play-mark{width:31px;height:31px;border:1px solid #8e7155;border-radius:50%;display:grid;place-items:center}
+.play-mark:after{content:"";border-left:7px solid currentColor;border-block:4px solid transparent;margin-left:2px}.cinema-invite small{display:block;color:#6a5948;font:500 10px/1.4 var(--mono)}
+.film-chapters{left:calc(45% + 18px);bottom:calc(5% + 13px);background:#282222da;border-radius:30px;padding:0 13px;gap:13px}.design-b .film-toggle{right:calc(3.5% + 18px);bottom:calc(5% + 13px)}
+.cinema-open{overflow:hidden}
+dialog.project-cinema{width:min(92vw,1180px);padding:0;max-height:93svh;overflow:auto;color:#fff4e7;background:#242021;border:1px solid #b6a089}
+.project-cinema::backdrop{background:#171313dd;backdrop-filter:blur(9px)}.cinema-head,.cinema-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px clamp(16px,3vw,38px)}
+.cinema-head p,.cinema-foot>span{text-transform:uppercase;letter-spacing:.15em;font:500 10px/1.5 var(--sans);color:#ddc7a8}.cinema-head h2{font:400 clamp(22px,3.1vw,45px)/1.1 var(--serif);margin:0}
+.cinema-head button{border:1px solid #ac9682;border-radius:50%;width:38px;height:38px;display:grid;place-items:center}.cinema-head button svg{width:15px}
+.project-cinema video{display:block;width:100%;height:auto;max-height:68svh;background:#161315;aspect-ratio:16/9}
+.cinema-foot div{display:flex;gap:9px}.cinema-foot button{color:#f2dfc9;border:1px solid #8c7b6d;border-radius:20px;padding:6px 11px;font:500 11px var(--sans)}.cinema-foot button[aria-pressed=true]{background:#e2c8a8;color:#302724}
+.design-b .house-section{background:linear-gradient(130deg,#ece5d8,#f3ebdc 56%,#e4d9c8)}
+.model-sheet{box-shadow:0 19px 42px -32px #54433187}.drawing-head{min-height:46px}
+.apartment-filmstrip{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(7px,1.5vw,20px);margin-top:13px;border-top:1px solid #b9aa96;padding-top:14px}
+.apartment-filmstrip button{position:relative;padding:0;text-align:left;overflow:hidden;background:#ded2c1}
+.apartment-filmstrip img{width:100%;aspect-ratio:2.05;object-fit:cover;transition:transform .55s var(--curve)}
+.apartment-filmstrip button:hover img{transform:scale(1.045)}
+.apartment-filmstrip span{position:absolute;bottom:0;left:0;right:0;padding:20px 9px 7px;background:linear-gradient(0deg,#27201fe8,transparent);color:#fff;font:500 11px/1.4 var(--sans)}
+.room-spread{display:grid;grid-template-columns:minmax(0,1fr);margin-top:31px}
+.room-shots{position:relative;overflow:hidden}.room-shots figure{margin:0;position:relative}.room-shots figure figcaption{position:absolute;left:clamp(13px,3vw,46px);bottom:clamp(14px,3vw,45px);color:#fff6e7;pointer-events:none;font:italic 400 clamp(38px,5vw,88px)/.98 var(--serif);text-shadow:0 2px 12px #191418aa}
+.room-shots figcaption small{display:block;margin:0 0 9px;font:600 11px var(--mono);letter-spacing:.14em}
+.design-b .room-shots .imgbtn{aspect-ratio:2.48}.room-shots .imgbtn:after{content:"";position:absolute;pointer-events:none;inset:45% 0 0;background:linear-gradient(0deg,#211d1dd6,transparent 88%)}.room-shots .image-caption{display:none}
+.room-tabs{display:none}.room-spread.ready .room-tabs{display:grid;grid-template-columns:repeat(3,1fr)}
+.room-tabs button{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #837362;color:#e8d5c2;padding:15px 13px;font:500 15px/1.4 var(--sans)}.room-tabs small{font:10px var(--mono);color:#e4caaa}
+.room-tabs button[aria-pressed=true]{color:#fffaed;background:#44313a;box-shadow:inset 0 -2px #d5b58a}
+.folio-index button{gap:12px;padding-block:8px}.folio-index button img{display:block;width:52px;height:34px;object-fit:cover;filter:saturate(.65);transition:filter .3s}.folio-index button[aria-pressed=true] img,.folio-index button:hover img{filter:saturate(1.1)}
+.riverside{background:#e5e5d8}.paper-atlas{display:grid;grid-template-columns:1.2fr .8fr;gap:clamp(22px,4vw,70px);align-items:start}.atlas-window{position:relative;isolation:isolate;overflow:hidden;border:1px solid #a99d81;background:#e7dac6}
+.atlas-base{width:100%;height:auto;display:block}.paper-pin{position:absolute;display:grid;place-items:center;min-width:38px;min-height:38px;padding:0;transform:translate(-50%,-50%);color:#fff4de}
+.paper-pin span{display:grid;place-items:center;width:26px;height:26px;border:1px solid #f7efdf;border-radius:50%;background:#53453a;font:600 11px var(--mono);box-shadow:0 1px 4px #453c2c66;transition:transform .35s}
+.paper-pin[aria-pressed=true] span{background:#814a2f;transform:scale(1.14);outline:1px solid #8d6849;outline-offset:3px}
+.atlas-key{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 7px}.atlas-key button{display:flex;align-items:center;gap:6px;color:#3e3329;font:500 12px/1.4 var(--sans);border:1px solid #a99a85;border-radius:24px;padding:8px 11px}
+.atlas-key button[aria-pressed=true]{background:#463932;color:#fff4e8}.atlas-key button span{font:10px var(--mono)}.atlas-credit{text-decoration:underline;font-size:10px;color:#574c3e}
+.atlas-photos figure{margin:0}.atlas-photos .imgbtn{border:1px solid #a99d81}.atlas-photos figure h3{font:400 clamp(34px,3.6vw,61px)/1.03 var(--serif);letter-spacing:-.035em;margin:16px 0 10px}.atlas-photos figure p{font-size:14px;max-width:39ch}
+.atlas-photos .b-text-link{margin-top:7px}.atlas-photos .image-caption{display:none}
+@media(max-width:760px){
+ .design-b .atelier-head{height:62px}.design-b .atelier-head .mainnav.open{background:#3b302d;color:#fff5e7}
+ .design-b .film-cover{height:88svh;min-height:650px}.gate-scene{inset:13% 4% 22% 30%}.film-ink{align-self:flex-end;padding:0 var(--gutter) 36px;width:68%;z-index:2}.design-b .film-ink h1{font-size:clamp(54px,8.5vw,80px);margin-bottom:8px}
+ .design-b .film-cover:after{display:block;background:linear-gradient(0deg,#f2e7d5 11%,#f2e7d5ee 24%,transparent 55%);z-index:1;pointer-events:none}
+ .film-chapters{left:auto;right:5%;bottom:calc(22% + 16px);z-index:3}.design-b .film-toggle{right:5%;bottom:18%}.cover-address{margin:12px 0 9px}
+ .paper-atlas{grid-template-columns:1fr}.atlas-photos figure{display:grid;grid-template-columns:1.12fr 1fr;gap:12px;align-items:center}.atlas-photos figure h3{margin-top:0}
+ .folio-index button img{width:32px;height:25px}.folio-index button span{display:none}.room-tabs button{font-size:13px}.design-b .room-shots .imgbtn{aspect-ratio:1.65}
+}
+@media(max-width:550px){
+ .design-b .film-cover{height:auto;min-height:0;display:flex;flex-direction:column;padding:75px var(--gutter) 30px;gap:24px}
+ .gate-scene{position:relative;inset:auto;width:100%;height:clamp(230px,38svh,375px);border-radius:48% 48% 0 0 / 50% 50% 0 0}
+ .design-b .film-cover:after{display:none}.film-cover:before{inset:50% -25% -33% 10%}
+ .film-ink{position:relative;align-self:flex-start;width:100%;padding:0}.design-b .film-ink h1{font-size:clamp(50px,12vw,68px);margin:10px 0 6px}
+ .design-b .film-ink .title-line:first-child{display:inline-block;vertical-align:baseline}.design-b .film-ink h1 .title-line:first-child{font-size:.76em}
+ .film-ink .b-eyebrow{font-size:9px}.cover-address{font-size:13px;margin:11px 0 10px}.cover-invitations{gap:15px}
+ .film-chapters{top:calc(75px + clamp(230px,38svh,375px) - 38px);bottom:auto;left:calc(var(--gutter) + 7px);right:auto;gap:8px;padding:0 8px}.film-chapters button{min-height:30px;font-size:8px}
+ .design-b .film-toggle{top:calc(75px + clamp(230px,38svh,375px) - 38px);bottom:auto;right:calc(var(--gutter) + 7px);min-height:30px;padding:5px 8px;font-size:9px}
+ .cinema-invite,.design-b .film-link{font-size:11px}.cinema-head,.cinema-foot{padding:10px}.cinema-foot>span{display:none}.cinema-foot div{justify-content:center;width:100%}
+ .apartment-filmstrip img{aspect-ratio:1.18}.apartment-filmstrip span{display:none}.room-tabs button{flex-direction:column;align-items:flex-start;gap:4px;padding:10px 7px}
+ .atlas-photos figure{display:block}.atlas-photos figure h3{margin-top:12px}.folio-index button img{display:none}.folio-index button span{display:inline}
+}
+@media(prefers-reduced-motion:reduce){.apartment-filmstrip img,.paper-pin span,.folio-index button img{transition:none}}
+.orbit-controls{position:absolute;top:12px;right:15px;z-index:2;display:flex;gap:5px}
+.orbit-controls button{display:grid;place-items:center;min-width:34px;height:34px;padding:0;border:1px solid #9d8a70;border-radius:50%;background:#fffaf0e8;color:#483626;font:500 19px/1 var(--sans)}
+.orbit-controls button:hover{background:#e8dbc6}
+.ns-studio[data-pose=moving]:not([data-phase=detail]) .orbit-controls{visibility:hidden}
+.facade-study figcaption{flex-wrap:wrap;gap:8px 12px}.facade-study figcaption input{flex:1;min-width:62px;max-width:150px}
+.lens-switch{border:1px solid #aa9380;border-radius:20px;font:600 11px/1.4 var(--sans);padding:7px 11px;color:#4e3d30}.lens-switch[aria-pressed=true]{background:#493830;color:#fff7e7}
+.lens-active{touch-action:none;cursor:crosshair}.lens-active .imgbtn{cursor:crosshair}.lens-active .zoombadge{display:none}
+.masonry-lens{pointer-events:none;position:absolute;z-index:4;transform:translate(-50%,-50%);width:clamp(95px,12vw,173px);aspect-ratio:1;border-radius:50%;border:3px solid #e8cea4;background-repeat:no-repeat;box-shadow:0 0 0 1px #674c37,0 7px 18px #2a1d244c,inset 0 0 10px #342c1e55}
+.lens-instruction{font-size:11px;color:#624d3b;line-height:1.5;margin:8px 0 0}
+.design-b .film-ink h1 .title-line:nth-child(2){white-space:nowrap;overflow:visible}
+.title-line sup{margin-left:.18em}
+@media(min-width:761px){.design-b .film-ink h1{font-size:clamp(53px,6.55vw,119px)}}
+.price-options{margin-top:8px}.design-b .price-sheet summary,.sheets-archive summary{padding-block:18px;font:500 clamp(16px,1.55vw,24px)/1.35 var(--sans);letter-spacing:-.04em}
+.price-rows button{grid-template-columns:minmax(140px,1.4fr) .7fr .75fr 1.3fr 17px;min-height:64px;gap:12px}
+.inventory-apartment{display:flex;align-items:center;gap:13px;font-weight:600}.inventory-apartment img{width:64px;height:42px;object-fit:cover;border:1px solid #baac9a}.inventory-apartment small{display:block;margin-top:3px;font:500 10px var(--mono);color:#655544}
+.specific-visit{grid-column:1/-1;justify-self:start;border-bottom:1px solid #9d8260;font:600 12px/1.5 var(--sans);padding:4px 0;margin-top:7px}
+.specific-visit svg{width:12px;height:12px;vertical-align:middle;margin-left:7px}
+.design-b #detail{background:#faf3e7;border:1px solid #b9a68c}.design-b .unit-detail .kicker{color:#73583e}.design-b .unit-detail h2{color:#352821;letter-spacing:-.045em}
+.design-b .detail-tabs{gap:5px;margin-bottom:11px}.design-b .detail-tabs button{border-radius:24px}.design-b .detail-facts{padding:13px 0;gap:16px 23px}.design-b .detail-facts dd{color:#3d2f27}
+.project-contact{grid-template-columns:minmax(0,1.08fr) minmax(155px,.65fr) minmax(0,.87fr);gap:4%}
+.visit-card{display:block;position:relative;border:1px solid #ac9273;overflow:hidden}.visit-card img{width:100%;aspect-ratio:.89;object-fit:cover;transition:transform .6s var(--curve)}
+.visit-card:hover img{transform:scale(1.045)}.visit-card>span{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#272020f2,#27202094,transparent);padding:33px 11px 11px;font-size:12px;font-weight:600}
+.visit-card small{display:flex;gap:7px;align-items:center;margin-top:4px;color:#f2ddbc}.visit-card svg{width:12px;height:12px}
+.project-contact address{padding-left:clamp(12px,2vw,30px)}
+@media(max-width:760px){.project-contact{grid-template-columns:1fr 1fr;gap:20px}.project-contact>div{grid-column:1/-1}.project-contact address{border:0;margin:0;padding:0}.visit-card img{aspect-ratio:1.4}}
+@media(max-width:550px){.price-rows button{grid-template-columns:1.05fr .68fr .73fr 1.35fr 12px;gap:4px;min-height:48px}.inventory-apartment img{display:none}.inventory-apartment small{font-size:9px}.project-contact{grid-template-columns:1fr}.visit-card img{aspect-ratio:2.5}}

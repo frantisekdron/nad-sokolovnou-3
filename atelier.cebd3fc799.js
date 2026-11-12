@@ -25,6 +25,20 @@ if(el('.plan-console')) {
   function selectApartment(id) {
     const u=lookup(id);
     selectedId=id;
+    const strip=el('[data-apartment-filmstrip]');
+    strip.replaceChildren();strip.hidden=!u.photos.length;
+    const indexes=Array.from(new Set([0,Math.floor(u.photos.length/2),u.photos.length-1]));
+    if(u.photos.length)for(const i of indexes){
+      const key=u.photos[i],caption=pictures[key],b=document.createElement('button');
+      const image=document.createElement('img'),label=document.createElement('span');
+      image.src='assets/'+key+'-640.webp';image.alt='';image.loading='lazy';image.decoding='async';
+      label.textContent=caption;b.type='button';b.append(image,label);
+      b.setAttribute('aria-label','Zvětšit fotografii bytu '+id+' – '+caption);
+      b.addEventListener('click',()=>{unitDialog(id,u.image,i);enlargeUnit();});
+      strip.append(b);
+    }
+    const visit=el('[data-specific-visit]');
+    visit.hidden=u.sold;visit.href=u.mail;visit.setAttribute('aria-label','Sjednat prohlídku bytu '+u.id);
     const photoLink=el('[data-floor-photos]');
     photoLink.hidden=!u.photos.length;
     if(u.photos.length)photoLink.textContent='Fotografie bytu '+id+' ('+u.photos.length+')';
@@ -85,7 +99,7 @@ if(el('.plan-console')) {
     film.src='assets/atelier/pruceli-'+format+'.mp4';
   }
   function syncFilm() {
-    if (!wanted || !visible || document.hidden) {
+    if (!wanted || !visible || document.hidden || el('#project-cinema')?.open) {
       film.pause();
       return;
     }
